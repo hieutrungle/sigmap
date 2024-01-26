@@ -51,16 +51,30 @@ def main():
     utils.log_args(args)
 
     # Prepare folders
+    img_folder, img_tmp_folder, video_folder = get_output_folders(args)
+    compute_coverage_map(args)
+
+    with timer.Timer(
+        text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
+    ):
+        logger.log(f"\nCreating video for {args.scene_name}")
+        create_video(img_tmp_folder, video_folder, args)
+
+
+@timer.Timer(text="Elapsed coverage map time: {:0.4f} seconds\n", logger_fn=logger.log)
+def compute_coverage_map(args):
+    # Prepare folders
     cm_scene_folders, viz_scene_folders = get_input_folders(args)
     img_folder, img_tmp_folder, video_folder = get_output_folders(args)
 
+    # Compute coverage maps
     for i, (cm_scene_folder, viz_scene_folder) in enumerate(
         zip(cm_scene_folders, viz_scene_folders)
     ):
-        break
         # Compute coverage maps with ceiling on
         cam = map_prep.prepare_camera(args)
         filename = os.path.join(cm_scene_folder, f"{args.blender_filename}.xml")
+        logger.log(f"Computing coverage map for {filename}")
         scene = map_prep.prepare_scene(args, filename, cam)
 
         cm = scene.coverage_map(
@@ -69,7 +83,6 @@ def main():
             num_samples=args.num_samples,
             diffraction=args.diffraction,
         )
-        # cm=None
 
         # Visualize coverage maps
         filename = os.path.join(viz_scene_folder, f"{args.blender_filename}.xml")
@@ -93,14 +106,6 @@ def main():
                 img_folder, f"{args.blender_filename}_scene_{i:02d}.png"
             )
             scene.render_to_file(**render_args)
-            break
-
-        if i == 10:
-            break
-
-    # Create video
-    # if args.video:
-    create_video(img_tmp_folder, video_folder, args)
 
 
 def create_argparser():
