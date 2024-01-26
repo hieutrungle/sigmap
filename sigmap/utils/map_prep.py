@@ -3,13 +3,12 @@ from sionna.rt import load_scene, Transmitter, Receiver, PlanarArray, Camera
 
 def prepare_scene(args, filename, cam=None):
     # Scene Setup
-    print(f"filename: {filename}")
     scene = load_scene(filename)
 
-    scene.frequency = args.frequency  # in Hz; implicitly updates RadioMaterials
-    scene.synthetic_array = (
-        args.synthetic_array
-    )  # If set to False, ray tracing will be done per antenna element (slower for large arrays)
+    # in Hz; implicitly updates RadioMaterials
+    scene.frequency = args.frequency
+    # If set to False, ray tracing will be done per antenna element (slower for large arrays)
+    scene.synthetic_array = args.synthetic_array
 
     if cam is not None:
         scene.add(cam)
