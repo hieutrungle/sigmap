@@ -40,6 +40,7 @@ from sionna.ofdm import KBestDetector, LinearDetector
 from sionna.mimo import StreamManagement
 
 from sigmap.utils import utils, timer, logger
+import subprocess
 
 
 def main():
@@ -56,10 +57,11 @@ def main():
     for i, (cm_scene_folder, viz_scene_folder) in enumerate(
         zip(cm_scene_folders, viz_scene_folders)
     ):
+        break
         # Compute coverage maps with ceiling on
         cam = map_prep.prepare_camera(args)
-        args.filename = os.path.join(cm_scene_folder, f"{args.filename}.xml")
-        scene = map_prep.prepare_scene(args, cam)
+        filename = os.path.join(cm_scene_folder, f"{args.blender_filename}.xml")
+        scene = map_prep.prepare_scene(args, filename, cam)
 
         cm = scene.coverage_map(
             max_depth=args.max_depth,
@@ -70,47 +72,47 @@ def main():
         # cm=None
 
         # Visualize coverage maps
-        args.filename = os.path.join(viz_scene_folder, f"{args.filename}.xml")
-        scene = map_prep.prepare_scene(args, cam)
+        filename = os.path.join(viz_scene_folder, f"{args.blender_filename}.xml")
+        scene = map_prep.prepare_scene(args, filename, cam)
 
-        scene.render_to_file(
+        render_args = dict(
             camera=cam,
-            filename=os.path.join(img_tmp_folder, f"{args.filename}_{i:02d}.png"),
+            filename=os.path.join(
+                img_tmp_folder, f"{args.blender_filename}_{i:02d}.png"
+            ),
             coverage_map=cm,
             cm_vmin=args.cm_vmin,
             cm_vmax=args.cm_vmax,
-            show_devices=False,
             resolution=args.resolution,
+            show_devices=True,
         )
+        scene.render_to_file(**render_args)
 
         if i == 0:
-            scene.render_to_file(
-                cam,
-                filename=os.path.join(img_folder, f"{args.filename}_scene_{i:02d}.png"),
-                cm_vmin=args.cm_vmin,
-                cm_vmax=args.cm_vmax,
-                show_devices=True,
-                resolution=args.resolution,
+            render_args["filename"] = os.path.join(
+                img_folder, f"{args.blender_filename}_scene_{i:02d}.png"
             )
-            scene.render(
-                cam,
-                coverage_map=cm,
-                cm_vmin=args.cm_vmin,
-                cm_vmax=args.cm_vmax,
-                show_devices=True,
-                resolution=args.resolution,
-            )
+            scene.render_to_file(**render_args)
+            break
+
+        if i == 10:
+            break
+
+    # Create video
+    # if args.video:
+    create_video(img_tmp_folder, video_folder, args)
 
 
 def create_argparser():
     """Parses command line arguments."""
     defaults = dict(
-        filename="hallway",
+        blender_filename="hallway",
         scene_name="tee_hallway",
         resolution=(1920, 1080),
         cm_vmin=-150,
         cm_vmax=-70,
         verbose=True,
+        video=False,
         default_end="",
     )
     defaults.update(utils.scene_defaults())
@@ -160,6 +162,36 @@ def get_output_folders(args):
     utils.mkdir_not_exists(video_folder)
 
     return (img_folder, img_tmp_folder, video_folder)
+
+
+def check_ffmpeg_installed():
+    try:
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def create_video(img_tmp_folder, video_folder, args):
+    if check_ffmpeg_installed():
+        video_path = utils.create_filename(video_folder, f"{args.scene_name}.mp4")
+        subprocess.call(
+            [
+                "ffmpeg",
+                "-framerate",
+                "1",
+                "-i",
+                os.path.join(img_tmp_folder, f"{args.blender_filename}" + "_%02d.png"),
+                "-r",
+                "30",
+                "-pix_fmt",
+                "yuv420p",
+                video_path,
+            ]
+        )
+        logger.log(f"Video saved to {video_path}")
+    else:
+        logger.log("ffmpeg is not installed. Please install ffmpeg to create videos.")
 
 
 if __name__ == "__main__":

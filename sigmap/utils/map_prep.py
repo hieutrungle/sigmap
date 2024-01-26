@@ -1,10 +1,10 @@
 from sionna.rt import load_scene, Transmitter, Receiver, PlanarArray, Camera
 
 
-def prepare_scene(args, cam=None):
+def prepare_scene(args, filename, cam=None):
     # Scene Setup
-    scene = load_scene(args.filename)
-    print(f"filename: {args.filename}")
+    print(f"filename: {filename}")
+    scene = load_scene(filename)
 
     scene.frequency = args.frequency  # in Hz; implicitly updates RadioMaterials
     scene.synthetic_array = (
