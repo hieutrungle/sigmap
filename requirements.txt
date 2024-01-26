@@ -1,0 +1,5 @@
+matplotlib==3.8.1
+numpy==1.26.3
+setuptools==68.0.0
+sionna==0.15.1
+tensorflow==2.14.0
