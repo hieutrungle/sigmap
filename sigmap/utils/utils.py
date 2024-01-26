@@ -3,6 +3,7 @@ import shutil
 import re
 import argparse
 from sigmap.utils import logger
+import glob
 
 
 def mkdir_not_exists(folder_dir):
@@ -145,6 +146,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("boolean value expected")
 
 
+# Logging
 def log_args(args):
     """Logs arguments to the console."""
     logger.log(f"{'*'*23} ARGS BEGIN {'*'*23}")
@@ -157,3 +159,45 @@ def log_args(args):
                 message += f"{k} = {v}\n"
         logger.log(f"{message}")
     logger.log(f"{'*'*24} ARGS END {'*'*24}\n")
+
+
+# Input and output folders
+def get_input_folders(args):
+    # Scene directory
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    asset_dir = os.path.join(parent_dir, "assets")
+    blender_scene_dir = os.path.join(asset_dir, "blender")
+
+    cm_scene_folders = glob.glob(
+        os.path.join(blender_scene_dir, f"{args.scene_name}_ceiling_color_*")
+    )
+    cm_scene_folders = sorted(
+        cm_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
+    )
+    sort_nicely(cm_scene_folders)
+
+    viz_scene_folders = glob.glob(
+        os.path.join(blender_scene_dir, f"{args.scene_name}_color_*")
+    )
+    viz_scene_folders = sorted(
+        viz_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
+    )
+    sort_nicely(viz_scene_folders)
+
+    return (cm_scene_folders, viz_scene_folders)
+
+
+def get_output_folders(args):
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    asset_dir = os.path.join(parent_dir, "assets")
+
+    img_folder = os.path.join(asset_dir, "images")
+    mkdir_not_exists(img_folder)
+    img_tmp_folder = os.path.join(img_folder, f"tmp_{args.scene_name}")
+    mkdir_not_exists(img_tmp_folder)
+    video_folder = os.path.join(asset_dir, "videos")
+    mkdir_not_exists(video_folder)
+
+    return (img_folder, img_tmp_folder, video_folder)

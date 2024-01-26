@@ -51,7 +51,7 @@ def main():
     utils.log_args(args)
 
     # Prepare folders
-    img_folder, img_tmp_folder, video_folder = get_output_folders(args)
+    img_folder, img_tmp_folder, video_folder = utils.get_output_folders(args)
     compute_coverage_map(args)
 
     with timer.Timer(
@@ -61,11 +61,31 @@ def main():
         create_video(img_tmp_folder, video_folder, args)
 
 
+def create_argparser():
+    """Parses command line arguments."""
+    defaults = dict(
+        blender_filename="hallway",
+        scene_name="tee_hallway",
+        resolution=(1920, 1080),
+        cm_vmin=-150,
+        cm_vmax=-70,
+        verbose=True,
+        video=False,
+        default_end="",
+    )
+    defaults.update(utils.scene_defaults())
+    defaults.update(utils.device_defaults())
+    defaults.update(utils.rt_defaults())
+    parser = argparse.ArgumentParser()
+    utils.add_dict_to_argparser(parser, defaults)
+    return parser
+
+
 @timer.Timer(text="Elapsed coverage map time: {:0.4f} seconds\n", logger_fn=logger.log)
 def compute_coverage_map(args):
     # Prepare folders
-    cm_scene_folders, viz_scene_folders = get_input_folders(args)
-    img_folder, img_tmp_folder, video_folder = get_output_folders(args)
+    cm_scene_folders, viz_scene_folders = utils.get_input_folders(args)
+    img_folder, img_tmp_folder, video_folder = utils.get_output_folders(args)
 
     # Compute coverage maps
     for i, (cm_scene_folder, viz_scene_folder) in enumerate(
@@ -106,67 +126,6 @@ def compute_coverage_map(args):
                 img_folder, f"{args.blender_filename}_scene_{i:02d}.png"
             )
             scene.render_to_file(**render_args)
-
-
-def create_argparser():
-    """Parses command line arguments."""
-    defaults = dict(
-        blender_filename="hallway",
-        scene_name="tee_hallway",
-        resolution=(1920, 1080),
-        cm_vmin=-150,
-        cm_vmax=-70,
-        verbose=True,
-        video=False,
-        default_end="",
-    )
-    defaults.update(utils.scene_defaults())
-    defaults.update(utils.device_defaults())
-    defaults.update(utils.rt_defaults())
-    parser = argparse.ArgumentParser()
-    utils.add_dict_to_argparser(parser, defaults)
-    return parser
-
-
-def get_input_folders(args):
-    # Scene directory
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    parent_dir = os.path.dirname(current_dir)
-    asset_dir = os.path.join(parent_dir, "assets")
-    blender_scene_dir = os.path.join(asset_dir, "blender")
-
-    cm_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{args.scene_name}_ceiling_color_*")
-    )
-    cm_scene_folders = sorted(
-        cm_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
-    )
-    utils.sort_nicely(cm_scene_folders)
-
-    viz_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{args.scene_name}_color_*")
-    )
-    viz_scene_folders = sorted(
-        viz_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
-    )
-    utils.sort_nicely(viz_scene_folders)
-
-    return (cm_scene_folders, viz_scene_folders)
-
-
-def get_output_folders(args):
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    parent_dir = os.path.dirname(current_dir)
-    asset_dir = os.path.join(parent_dir, "assets")
-
-    img_folder = os.path.join(asset_dir, "images")
-    utils.mkdir_not_exists(img_folder)
-    img_tmp_folder = os.path.join(img_folder, f"tmp_{args.scene_name}")
-    utils.mkdir_not_exists(img_tmp_folder)
-    video_folder = os.path.join(asset_dir, "videos")
-    utils.mkdir_not_exists(video_folder)
-
-    return (img_folder, img_tmp_folder, video_folder)
 
 
 def check_ffmpeg_installed():
