@@ -61,7 +61,7 @@ def main():
         create_video(img_tmp_folder, video_folder, args)
 
 
-def create_argparser():
+def create_argparser() -> argparse.ArgumentParser:
     """Parses command line arguments."""
     defaults = dict(
         blender_filename="hallway",

@@ -4,20 +4,21 @@ import re
 import argparse
 from sigmap.utils import logger
 import glob
+from typing import Dict, List, Union, Tuple
 
 
-def mkdir_not_exists(folder_dir):
+def mkdir_not_exists(folder_dir: str) -> None:
     if not os.path.exists(folder_dir):
         os.makedirs(folder_dir)
 
 
-def mkdir_with_replacement(folder_dir):
+def mkdir_with_replacement(folder_dir: str) -> None:
     if os.path.exists(folder_dir):
         shutil.rmtree(folder_dir)
     os.makedirs(folder_dir)
 
 
-def create_filename(dir, filename):
+def create_filename(dir: str, filename: str) -> str:
     """Create a filename in the given directory. If the filename already exists, append a number to the filename."""
     mkdir_not_exists(dir)
     filename = os.path.join(dir, filename)
@@ -31,7 +32,7 @@ def create_filename(dir, filename):
 
 
 # Sorting
-def tryint(s):
+def tryint(s: str) -> int:
     try:
         return int(s)
     except:
@@ -39,7 +40,7 @@ def tryint(s):
 
 
 # Sorting
-def alphanum_key(s):
+def alphanum_key(s: str) -> List[Union[str, int]]:
     """Turn a string into a list of string and number chunks.
     "z23a" -> ["z", 23, "a"]
     """
@@ -47,7 +48,7 @@ def alphanum_key(s):
 
 
 # Sorting
-def sort_nicely(l):
+def sort_nicely(l: List[str]):
     """Sort the given list in the way that humans expect."""
     l.sort(key=alphanum_key)
 
@@ -64,7 +65,7 @@ class Config:
 
 
 # Default for args
-def scene_defaults():
+def scene_defaults() -> Dict[str, Union[str, float, bool]]:
     """
     Defaults for scene.
     """
@@ -79,7 +80,7 @@ def scene_defaults():
     )
 
 
-def device_defaults():
+def device_defaults() -> Dict[str, Union[str, float, bool]]:
     """
     Defaults for devices.
     """
@@ -105,7 +106,7 @@ def device_defaults():
     )
 
 
-def rt_defaults():
+def rt_defaults() -> Dict[str, Union[str, float, bool]]:
     """
     Defaults for ray tracing.
     """
@@ -118,7 +119,10 @@ def rt_defaults():
     )
 
 
-def add_dict_to_argparser(parser, default_dict):
+def add_dict_to_argparser(
+    parser: argparse.ArgumentParser,
+    default_dict: Dict[str, Union[str, float, bool]],
+) -> None:
     for k, v in default_dict.items():
         v_type = type(v)
         if v is None:
@@ -128,11 +132,14 @@ def add_dict_to_argparser(parser, default_dict):
         parser.add_argument(f"--{k}", default=v, type=v_type)
 
 
-def args_to_dict(args, keys):
+def args_to_dict(
+    args: argparse.Namespace,
+    keys: List[str],
+) -> Dict[str, Union[str, float, bool]]:
     return {k: getattr(args, k) for k in keys}
 
 
-def str2bool(v):
+def str2bool(v: str) -> bool:
     """
     https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
     """
@@ -147,7 +154,7 @@ def str2bool(v):
 
 
 # Logging
-def log_args(args):
+def log_args(args: argparse.Namespace) -> None:
     """Logs arguments to the console."""
     logger.log(f"{'*'*23} ARGS BEGIN {'*'*23}")
     if args.verbose == True:
@@ -162,7 +169,7 @@ def log_args(args):
 
 
 # Input and output folders
-def get_input_folders(args):
+def get_input_folders(args: argparse.Namespace) -> Tuple[str]:
     # Scene directory
     current_dir = os.path.dirname(os.path.realpath(__file__))
     parent_dir = os.path.dirname(current_dir)
@@ -188,7 +195,7 @@ def get_input_folders(args):
     return (cm_scene_folders, viz_scene_folders)
 
 
-def get_output_folders(args):
+def get_output_folders(args: argparse.Namespace) -> Tuple[str]:
     current_dir = os.path.dirname(os.path.realpath(__file__))
     parent_dir = os.path.dirname(current_dir)
     asset_dir = os.path.join(parent_dir, "assets")
