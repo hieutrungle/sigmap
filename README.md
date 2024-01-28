@@ -28,7 +28,7 @@ pip install -e .
 ### Folder structure
 
 ``` bash
-Sigmap
+sigmap
 ├── sigmap
 │   ├── data
 ├── assets
@@ -52,7 +52,7 @@ In `assets/blender` directory, you have to provide the following:
 - `scene_celing_color.blend`: Blender scene with the ceiling of the structure on. This file is used to compute coverage maps even though they are not visible using visualization tools.
 - `scene_color.blend`: Blender scene with the ceiling of the structure off so that coverage maps can be seen (visualization purposes)
 
-The other two directories `images` and `videos` are used to store the images and videos of the structure. They will be automatically created when running the code.
+The other two directories `assets/images` and `assets/videos` are used to store the images and videos of the structure. They will be automatically created when running the code.
 
 ## Run
 
@@ -62,9 +62,9 @@ The other two directories `images` and `videos` are used to store the images and
 python sigmap/compute_coverage_maps.py 
 ```
 
-### Arguements
+### Arguments
 
-[TODO] Add arguements
+[TODO] Add arguments
 
 ## Features
 
