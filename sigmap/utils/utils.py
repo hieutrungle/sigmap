@@ -53,131 +53,45 @@ def sort_nicely(l: List[str]):
     l.sort(key=alphanum_key)
 
 
-class Config:
-    def __init__(self, *args, **kwargs):
-        self.__dict__.update(kwargs)
-
-    def __repr__(self):
-        return str(self.__dict__)
-
-    def __str__(self):
-        return str(self.__dict__)
-
-
-# Default for args
-def scene_defaults() -> Dict[str, Union[str, float, bool]]:
-    """
-    Defaults for scene.
-    """
-    return dict(
-        filename="",
-        cam_position=[-7.5, -4.0, 50.0],
-        cam_orientation=[0.0, 0.0, 0.0],
-        cam_look_at=[-7.5, -4.0, 0.0],
-        frequency=28e9,
-        synthetic_array=True,
-        scene_end="",
-    )
-
-
-def device_defaults() -> Dict[str, Union[str, float, bool]]:
-    """
-    Defaults for devices.
-    """
-    return dict(
-        tx_num_rows=4,
-        tx_num_cols=4,
-        tx_vertical_spacing=0.5,
-        tx_horizontal_spacing=0.5,
-        tx_pattern="tr38901",
-        tx_polarization="V",
-        tx_position=[2.2, 0.0, 1.5],
-        tx_orientation=[0.0, 0.0, 0.0],
-        rx_included=False,
-        rx_num_rows=1,
-        rx_num_cols=1,
-        rx_vertical_spacing=0.5,
-        rx_horizontal_spacing=0.5,
-        rx_pattern="iso",
-        rx_polarization="V",
-        rx_position=[-1.0, -4.225, 1.5],
-        rx_orientation=[0.0, 0.0, 0.0],
-        device_end="",
-    )
-
-
-def rt_defaults() -> Dict[str, Union[str, float, bool]]:
-    """
-    Defaults for ray tracing.
-    """
-    return dict(
-        max_depth=15,
-        cm_cell_size=[0.2, 0.2],
-        num_samples=6e6,
-        diffraction=True,
-        rt_end="",
-    )
-
-
-def add_dict_to_argparser(
-    parser: argparse.ArgumentParser,
-    default_dict: Dict[str, Union[str, float, bool]],
-) -> None:
-    for k, v in default_dict.items():
-        v_type = type(v)
-        if v is None:
-            v_type = str
-        elif isinstance(v, bool):
-            v_type = str2bool
-        parser.add_argument(f"--{k}", default=v, type=v_type)
-
-
-def args_to_dict(
-    args: argparse.Namespace,
-    keys: List[str],
-) -> Dict[str, Union[str, float, bool]]:
-    return {k: getattr(args, k) for k in keys}
-
-
-def str2bool(v: str) -> bool:
-    """
-    https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-    """
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("boolean value expected")
-
-
 # Logging
 def log_args(args: argparse.Namespace) -> None:
     """Logs arguments to the console."""
     logger.log(f"{'*'*23} ARGS BEGIN {'*'*23}")
-    if args.verbose == True:
-        message = ""
-        for k, v in args.__dict__.items():
-            if isinstance(v, str):
-                message += f"{k} = '{v}'\n"
-            else:
-                message += f"{k} = {v}\n"
-        logger.log(f"{message}")
+    message = ""
+    for k, v in args.__dict__.items():
+        if isinstance(v, str):
+            message += f"{k} = '{v}'\n"
+        else:
+            message += f"{k} = {v}\n"
+    logger.log(f"{message}")
     logger.log(f"{'*'*24} ARGS END {'*'*24}\n")
 
 
+def log_config(config: Dict[str, Union[str, float, bool]]) -> None:
+    """Logs configuration to the console."""
+    logger.log(f"{'*'*23} CONFIG BEGIN {'*'*23}")
+    message = ""
+    for k, v in config.__dict__.items():
+        if isinstance(v, str):
+            message += f"{k} = '{v}'\n"
+        else:
+            message += f"{k} = {v}\n"
+    logger.log(f"{message}")
+    logger.log(f"{'*'*24} CONFIG END {'*'*24}\n")
+
+
 # Input and output folders
-def get_input_folders(args: argparse.Namespace) -> Tuple[str]:
+def get_input_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
     # Scene directory
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    parent_dir = os.path.dirname(current_dir)
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
     asset_dir = os.path.join(parent_dir, "assets")
+    mkdir_not_exists(asset_dir)
     blender_scene_dir = os.path.join(asset_dir, "blender")
+    mkdir_not_exists(blender_scene_dir)
 
     cm_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{args.scene_name}_ceiling_color_*")
+        os.path.join(blender_scene_dir, f"{config.scene_name}_ceiling_color_*")
     )
     cm_scene_folders = sorted(
         cm_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
@@ -185,7 +99,7 @@ def get_input_folders(args: argparse.Namespace) -> Tuple[str]:
     sort_nicely(cm_scene_folders)
 
     viz_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{args.scene_name}_color_*")
+        os.path.join(blender_scene_dir, f"{config.scene_name}_color_*")
     )
     viz_scene_folders = sorted(
         viz_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
@@ -195,14 +109,14 @@ def get_input_folders(args: argparse.Namespace) -> Tuple[str]:
     return (cm_scene_folders, viz_scene_folders)
 
 
-def get_output_folders(args: argparse.Namespace) -> Tuple[str]:
+def get_output_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    parent_dir = os.path.dirname(current_dir)
+    parent_dir = os.path.dirname(os.path.dirname(current_dir))
     asset_dir = os.path.join(parent_dir, "assets")
 
     img_folder = os.path.join(asset_dir, "images")
     mkdir_not_exists(img_folder)
-    img_tmp_folder = os.path.join(img_folder, f"tmp_{args.scene_name}")
+    img_tmp_folder = os.path.join(img_folder, f"tmp_{config.scene_name}")
     mkdir_not_exists(img_tmp_folder)
     video_folder = os.path.join(asset_dir, "videos")
     mkdir_not_exists(video_folder)
