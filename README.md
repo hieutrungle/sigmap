@@ -59,7 +59,7 @@ The other two directories `assets/images` and `assets/videos` are used to store 
 ### Compute coverage maps
 
 ```bash
-python sigmap/compute_coverage_maps.py 
+python sigmap/main.py 
 ```
 
 ### Arguments
