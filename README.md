@@ -69,6 +69,8 @@ python sigmap/main.py
 ## Features
 
 - [x] Coverage Map - Sionna
+- [x] Coverage Map Visualization - Sionna
+- [x] Coverage Map Animation - ffmpeg
 
 ## In Progress
 
