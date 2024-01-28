@@ -36,12 +36,16 @@ sigmap
 │   │   ├── scene_celing_color.blend
 │   │   ├── scene_color.blend
 │   ├── images
-│   │   ├── scene
+│   │   ├── scene_1
 │   │   │   ├── image_conf_1.png
 │   │   │   ├── image_conf_2.png
 │   │   │   ├── image_conf_3.png
+│   │   ├── scene_2
+│   │   │   ├── image_conf_1.png
+│   │   │   ├── image_conf_2.png
 │   ├── videos
 │   │   ├── scene_1.mp4
+│   │   ├── scene_2.mp4
 
 ```
 
