@@ -3,7 +3,7 @@ base_config: tee_hallway
 # Defaults
 blender_filename: "hallway"
 scene_name: "tee_hallway"
-resolution: (1920, 1080)
+resolution: [1920, 1080]
 cm_vmin: -150
 cm_vmax: -70
 verbose: True
