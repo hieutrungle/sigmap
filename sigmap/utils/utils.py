@@ -26,7 +26,12 @@ def create_filename(dir: str, filename: str) -> str:
     i = 0
     while os.path.exists(tmp_filename):
         i += 1
-        tmp_filename = filename.split(".")[0] + f"_{i:03d}." + filename.split(".")[1]
+        name = filename.split(".")[0]
+        # if is numeric
+        if name[-3:].isdigit():
+            name = name[:-3]
+        ext = filename.split(".")[1]
+        tmp_filename = name + f"_{i:03d}." + ext
     filename = tmp_filename
     return filename
 
@@ -81,7 +86,9 @@ def log_config(config: Dict[str, Union[str, float, bool]]) -> None:
 
 
 # Input and output folders
-def get_input_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
+def get_input_folders(
+    args: argparse.Namespace, config: Dict[str, Union[str, float, bool]]
+) -> Tuple[str]:
     # Scene directory
     current_dir = os.path.dirname(os.path.realpath(__file__))
     parent_dir = os.path.dirname(os.path.dirname(current_dir))
@@ -91,7 +98,11 @@ def get_input_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
     mkdir_not_exists(blender_scene_dir)
 
     cm_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{config.scene_name}", f"ceiling_color*")
+        os.path.join(
+            blender_scene_dir,
+            f"{config.scene_name}",
+            f"ceiling_idx_{args.index}*",
+        )
     )
     cm_scene_folders = sorted(
         cm_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
@@ -99,7 +110,11 @@ def get_input_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
     sort_nicely(cm_scene_folders)
 
     viz_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{config.scene_name}", "color*")
+        os.path.join(
+            blender_scene_dir,
+            f"{config.scene_name}",
+            f"idx_{args.index}*",
+        )
     )
     viz_scene_folders = sorted(
         viz_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])

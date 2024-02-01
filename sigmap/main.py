@@ -75,6 +75,7 @@ def create_argparser() -> argparse.ArgumentParser:
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
     parser.add_argument("--video_enabled", action="store_true", default=False)
+    parser.add_argument("--index", type=int, default=0)
     scripting_utils.add_dict_to_argparser(parser, defaults)
     return parser
 
