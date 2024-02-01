@@ -19,11 +19,15 @@ def compute_coverage_map(args, config):
         scene = map_prep.prepare_scene(config, filename, cam)
 
         cm = scene.coverage_map(
-            max_depth=config.max_depth,
+            max_depth=config.cm_max_depth,
             cm_cell_size=config.cm_cell_size,
-            num_samples=config.num_samples,
+            num_samples=config.cm_num_samples,
             diffraction=config.diffraction,
         )
+        # paths = scene.compute_paths(
+        #     max_depth=config.path_max_depth, num_samples=config.path_num_samples
+        # )
+        paths = None
 
         # Visualize coverage maps
         filename = os.path.join(viz_scene_folder, f"{config.blender_filename}.xml")
@@ -31,6 +35,7 @@ def compute_coverage_map(args, config):
 
         render_config = dict(
             camera=cam,
+            paths=paths,
             filename=os.path.join(
                 img_tmp_folder, f"{config.blender_filename}_{i:02d}.png"
             ),
@@ -38,7 +43,7 @@ def compute_coverage_map(args, config):
             cm_vmin=config.cm_vmin,
             cm_vmax=config.cm_vmax,
             resolution=config.resolution,
-            show_devices=True,
+            show_devices=False,
         )
         scene.render_to_file(**render_config)
 
@@ -46,4 +51,5 @@ def compute_coverage_map(args, config):
             render_config["filename"] = os.path.join(
                 img_folder, f"{config.blender_filename}_scene_{i:02d}.png"
             )
+            render_config["show_devices"] = True
             scene.render_to_file(**render_config)
