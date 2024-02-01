@@ -58,11 +58,13 @@ def main():
     img_folder, img_tmp_folder, video_folder = utils.get_output_folders(config)
     compute.coverage_map.compute_coverage_map(args, config)
 
-    with timer.Timer(
-        text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
-    ):
+    # Create video
+    if args.video_enable:
         logger.log(f"\nCreating video for {config.scene_name}")
-        video_gen.create_video(img_tmp_folder, video_folder, config)
+        with timer.Timer(
+            text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
+        ):
+            video_gen.create_video(img_tmp_folder, video_folder, config)
 
 
 def create_argparser() -> argparse.ArgumentParser:
@@ -71,7 +73,8 @@ def create_argparser() -> argparse.ArgumentParser:
     # defaults.update(utils.rt_defaults())
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
-    parser.add_argument("--verbose", "-v", type=bool, default=False)
+    parser.add_argument("--verbose", "-v", action="store_true", default=False)
+    parser.add_argument("--video_enable", action="store_true", default=False)
     scripting_utils.add_dict_to_argparser(parser, defaults)
     return parser
 
