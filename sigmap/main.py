@@ -59,7 +59,7 @@ def main():
     compute.coverage_map.compute_coverage_map(args, config)
 
     # Create video
-    if args.video_enable:
+    if args.video_enabled:
         logger.log(f"\nCreating video for {config.scene_name}")
         with timer.Timer(
             text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
@@ -74,7 +74,7 @@ def create_argparser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
-    parser.add_argument("--video_enable", action="store_true", default=False)
+    parser.add_argument("--video_enabled", action="store_true", default=False)
     scripting_utils.add_dict_to_argparser(parser, defaults)
     return parser
 
