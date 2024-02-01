@@ -15,8 +15,6 @@ import bl_utils, bl_parser
 
 
 def export_beamfocusing_simple_hallway(args, config):
-    mid_pt = Vector(bl_utils.get_midpoint(config.tx_position, config.rx_position))
-
     # Collection
     tiles = bpy.data.collections["Reflector"].objects
 
@@ -28,21 +26,23 @@ def export_beamfocusing_simple_hallway(args, config):
             global_bbox_center = tile.matrix_world @ local_bbox_center
 
             # Compute rotation angles
-            r, theta, phi = bl_utils.compute_rot_angle_midpt(global_bbox_center, mid_pt)
+            r, theta, phi = bl_utils.compute_rot_angle_txrx(
+                global_bbox_center, config.tx_position, config.rx_position
+            )
 
             tile.rotation_euler = [0, theta, phi]
             tile.scale = [0.1, 0.1, 0.02]
 
         # Saving to mitsuba format for Sionna
         print(
-            f"\nsaving with rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
+            f"\nsaving with index: {args.index},  rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
         )
 
         # Save files without ceiling
         folder_dir = os.path.join(
             args.output_dir,
             f"{config.scene_name}",
-            f"color_rx_pos_{config.rx_position}",
+            f"idx_{args.index}_rx_pos_{config.rx_position}",
         )
         bl_utils.mkdir_with_replacement(folder_dir)
         bl_utils.save_mitsuba_xml(
@@ -53,7 +53,7 @@ def export_beamfocusing_simple_hallway(args, config):
         folder_dir = os.path.join(
             args.output_dir,
             f"{config.scene_name}",
-            f"ceiling_color_rx_pos_{config.rx_position}",
+            f"ceiling_idx_{args.index}_rx_pos_{config.rx_position}",
         )
         bl_utils.mkdir_with_replacement(folder_dir)
         bl_utils.save_mitsuba_xml(
@@ -79,6 +79,7 @@ def create_argparser() -> bl_parser.ArgumentParserForBlender:
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
     parser.add_argument("--output_dir", "-o", type=str, required=True)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
+    parser.add_argument("--index", type=int, default=0)
     return parser
 
 
