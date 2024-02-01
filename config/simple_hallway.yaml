@@ -1,4 +1,4 @@
-base_config: beamfocusing_simple_hallway
+base_config: simple_hallway
 
 # Defaults
 mitsuba_filename: "hallway"
