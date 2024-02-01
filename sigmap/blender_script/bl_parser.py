@@ -1,3 +1,6 @@
+"""
+https://blender.stackexchange.com/questions/6817/how-to-pass-command-line-arguments-to-a-blender-python-script
+"""
 import argparse
 import sys
 
