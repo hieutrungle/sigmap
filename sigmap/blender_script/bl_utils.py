@@ -138,9 +138,7 @@ def compute_rot_angle_midpt(
     z = tile_center[2] - midpoint[2]
 
     r = math.sqrt(x**2 + y**2 + z**2)
-    theta = math.acos(z / r)
-    phi = sign(y) * math.acos(x / math.sqrt(x**2 + y**2))
+    theta = math.acos(z / r)  # rotation in y-axis
+    phi = sign(y) * math.acos(x / math.sqrt(x**2 + y**2))  # rotation in z-axis
 
-    theta = math.degrees(theta)  # rotation in y-axis
-    phi = math.degrees(phi)  # rotation in z-axis
     return (r, theta, phi)
