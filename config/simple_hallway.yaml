@@ -1,8 +1,8 @@
-base_config: tee_hallway
+base_config: beamfocusing_simple_hallway
 
 # Defaults
 mitsuba_filename: "hallway"
-scene_name: "tee_hallway"
+scene_name: "beamfocusing_simple_hallway"
 resolution: [1920, 1080]
 cm_vmin: -150
 cm_vmax: -70
@@ -28,19 +28,21 @@ tx_pattern: "tr38901"
 tx_polarization: "V"
 tx_position: [2.2, 0.0, 1.5]
 tx_orientation: [0.0, 0.0, 0.0]
-rx_included: False
+rx_included: True
 rx_num_rows: 1
 rx_num_cols: 1
 rx_vertical_spacing: 0.5
 rx_horizontal_spacing: 0.5
 rx_pattern: "iso"
 rx_polarization: "V"
-rx_position: [-1.0, -4.225, 1.5]
+rx_position: [-3.0, -4.2, 1.5]
 rx_orientation: [0.0, 0.0, 0.0]
 device_end: ""
 
 # Ray tracing defaults
-max_depth: 15
+cm_max_depth: 15
 cm_cell_size: [0.2, 0.2]
-num_samples: 6e6
+cm_num_samples: 4e6
+path_max_depth: 2
+path_num_samples: 3e6
 diffraction: True
