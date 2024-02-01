@@ -14,7 +14,7 @@ def compute_coverage_map(args, config):
     ):
         # Compute coverage maps with ceiling on
         cam = map_prep.prepare_camera(config)
-        filename = os.path.join(cm_scene_folder, f"{config.blender_filename}.xml")
+        filename = os.path.join(cm_scene_folder, f"{config.mitsuba_filename}.xml")
         logger.log(f"Computing coverage map for {filename}")
         scene = map_prep.prepare_scene(config, filename, cam)
 
@@ -30,14 +30,14 @@ def compute_coverage_map(args, config):
         paths = None
 
         # Visualize coverage maps
-        filename = os.path.join(viz_scene_folder, f"{config.blender_filename}.xml")
+        filename = os.path.join(viz_scene_folder, f"{config.mitsuba_filename}.xml")
         scene = map_prep.prepare_scene(config, filename, cam)
 
         render_config = dict(
             camera=cam,
             paths=paths,
             filename=os.path.join(
-                img_tmp_folder, f"{config.blender_filename}_{i:02d}.png"
+                img_tmp_folder, f"{config.mitsuba_filename}_{i:02d}.png"
             ),
             coverage_map=cm,
             cm_vmin=config.cm_vmin,
@@ -49,7 +49,7 @@ def compute_coverage_map(args, config):
 
         if i == 0:
             render_config["filename"] = os.path.join(
-                img_folder, f"{config.blender_filename}_scene_{i:02d}.png"
+                img_folder, f"{config.scene_name}_scene_{i:02d}.png"
             )
             render_config["show_devices"] = True
             scene.render_to_file(**render_config)
