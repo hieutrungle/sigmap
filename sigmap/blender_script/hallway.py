@@ -41,7 +41,8 @@ def export_beamfocusing_simple_hallway(args, config):
         # Save files without ceiling
         folder_dir = os.path.join(
             args.output_dir,
-            f"{config.scene_name}_color_rx_pos_{config.rx_position}",
+            f"{config.scene_name}",
+            f"color_rx_pos_{config.rx_position}",
         )
         bl_utils.mkdir_with_replacement(folder_dir)
         bl_utils.save_mitsuba_xml(
@@ -51,7 +52,8 @@ def export_beamfocusing_simple_hallway(args, config):
         # Save files with ceiling
         folder_dir = os.path.join(
             args.output_dir,
-            f"{config.scene_name}_ceiling_color_rx_pos_{config.rx_position}",
+            f"{config.scene_name}",
+            f"ceiling_color_rx_pos_{config.rx_position}",
         )
         bl_utils.mkdir_with_replacement(folder_dir)
         bl_utils.save_mitsuba_xml(
