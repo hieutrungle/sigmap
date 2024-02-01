@@ -60,6 +60,28 @@ The other two directories `assets/images` and `assets/videos` are used to store 
 
 ## Run
 
+1. Export blender file to mitsuba file format
+
+```bash
+BLENDER_DIR=${HOME}/blender
+SIGMAP_DIR=${HOME}/research/sigmap
+ASSETS_DIR=${SIGMAP_DIR}/assets
+
+echo Exporting coverage map...
+echo Blender directory: $BLENDER_DIR
+echo Coverage map directory: $SIGMAP_DIR
+echo -e Assets directory: $ASSETS_DIR '\n'
+
+${BLENDER_DIR}/blender-3.3.12-linux-x64/blender -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SIGMAP_DIR}/sigmap/blender_script/hallway.py -- -cfg ${SIGMAP_DIR}/config/simple_hallway.yaml -o ${ASSETS_DIR}/blender
+echo Done
+```
+
+1. Compute coverage maps
+
+```bash
+python ./sigmap/main.py -cfg ./config/simple_hallway.yaml --verbose True --video_enable False
+```
+
 ### Compute coverage maps
 
 ```bash
