@@ -1,4 +1,5 @@
 import bpy
+from mathutils import Vector
 import os
 import shutil
 import math
@@ -73,13 +74,6 @@ def mkdir_with_replacement(folder_dir):
     os.makedirs(folder_dir)
 
 
-def get_midpoint(pt1, pt2):
-    x = (pt1[0] + pt2[0]) / 2
-    y = (pt1[1] + pt2[1]) / 2
-    z = (pt1[2] + pt2[2]) / 2
-    return [x, y, z]
-
-
 def sign(num):
     return -1 if num < 0 else 1
 
@@ -108,6 +102,37 @@ def save_mitsuba_xml(folder_dir, filename, collections):
     )
 
 
+def get_bisector_pt(tile_center: Vector, tx_pos: Vector, rx_pos: Vector) -> Vector:
+    """
+    Get the bisector point of the line between tx and rx.
+
+    tile_center: A
+    tx_pos: B
+    rx_pos: C
+    bisector_pt: D
+
+    ratio = -|AB|/|AC|
+
+    vec(BD) = ratio * vec(CD)
+
+    x_D = 1/(1 - ratio) * (x_B - ratio * x_C) \n
+    y_D = 1/(1 - ratio) * (y_B - ratio * y_C) \n
+    z_D = 1/(1 - ratio) * (z_B - ratio * z_C)
+    """
+    tile_tx_len = (tx_pos - tile_center).length  # |AB|
+    tile_rx_len = (rx_pos - tile_center).length  # |AC|
+    ratio = -tile_tx_len / tile_rx_len
+    bisector_pt = 1 / (1 - ratio) * (tx_pos - ratio * rx_pos)
+    return bisector_pt
+
+
+def get_midpoint(pt1, pt2):
+    x = (pt1[0] + pt2[0]) / 2
+    y = (pt1[1] + pt2[1]) / 2
+    z = (pt1[2] + pt2[2]) / 2
+    return [x, y, z]
+
+
 def compute_rot_angle_txrx(
     tile_center: list,
     tx_pos: list,
@@ -119,23 +144,23 @@ def compute_rot_angle_txrx(
         `theta`: rotation in y-axis
         `phi`: rotation in z-axis
     """
-    midpoint = get_midpoint(tx_pos, rx_pos)
-    return compute_rot_angle_midpt(tile_center, midpoint)
+    midpoint = get_bisector_pt(Vector(tile_center), Vector(tx_pos), Vector(rx_pos))
+    return compute_rot_angle(tile_center, midpoint)
 
 
-def compute_rot_angle_midpt(
+def compute_rot_angle(
     tile_center: list,
-    midpoint: list,
+    pt: list,
 ) -> Tuple[float, float, float]:
     """Compute the rotation angles for the tile.
     return: (r, theta, phi)
-        `r`: distance from the tile center to the midpoint of tx and rx
+        `r`: distance from the tile center to a point
         `theta`: rotation in y-axis
         `phi`: rotation in z-axis
     """
-    x = tile_center[0] - midpoint[0]
-    y = tile_center[1] - midpoint[1]
-    z = tile_center[2] - midpoint[2]
+    x = tile_center[0] - pt[0]
+    y = tile_center[1] - pt[1]
+    z = tile_center[2] - pt[2]
 
     r = math.sqrt(x**2 + y**2 + z**2)
     theta = math.acos(z / r)  # rotation in y-axis
