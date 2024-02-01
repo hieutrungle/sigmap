@@ -16,7 +16,7 @@ def check_if_images_exist(img_tmp_folder, config):
     criteria = [
         not os.path.exists(img_tmp_folder),
         not os.path.exists(
-            os.path.join(img_tmp_folder, f"{config.blender_filename}" + "_00.png")
+            os.path.join(img_tmp_folder, f"{config.mitsuba_filename}" + "_00.png")
         ),
         len(os.listdir(img_tmp_folder)) == 0,
     ]
@@ -37,7 +37,7 @@ def create_video(img_tmp_folder, video_folder, config):
                 "1",
                 "-i",
                 os.path.join(
-                    img_tmp_folder, f"{config.blender_filename}" + "_%02d.png"
+                    img_tmp_folder, f"{config.mitsuba_filename}" + "_%02d.png"
                 ),
                 "-r",
                 "30",
