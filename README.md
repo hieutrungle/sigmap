@@ -72,14 +72,17 @@ The other two directories `assets/images` and `assets/videos` are used to store 
     echo Coverage map directory: $SIGMAP_DIR
     echo -e Assets directory: $ASSETS_DIR '\n'
 
-    ${BLENDER_DIR}/blender-3.3.12-linux-x64/blender -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SIGMAP_DIR}/sigmap/blender_script/hallway.py -- -cfg ${SIGMAP_DIR}/config/simple_hallway.yaml -o ${ASSETS_DIR}/blender
+    ${BLENDER_DIR}/blender-3.3.12-linux-x64/blender \
+        -b ${BLENDER_DIR}/models/simple_hallway_color.blend \
+        --python ${SIGMAP_DIR}/sigmap/blender_script/hallway.py \
+            -- -cfg ${SIGMAP_DIR}/config/simple_hallway.yaml -o ${ASSETS_DIR}/blender
     echo Done
     ```
 
 2. Compute coverage maps
 
     ```bash
-    python ./sigmap/main.py -cfg ./config/simple_hallway.yaml --verbose True --video_enable False
+    python ./sigmap/main.py -cfg ./config/simple_hallway.yaml --verbose --video_enabled
     ```
 
 ### Compute coverage maps
