@@ -91,7 +91,7 @@ def get_input_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
     mkdir_not_exists(blender_scene_dir)
 
     cm_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{config.scene_name}_ceiling*")
+        os.path.join(blender_scene_dir, f"{config.scene_name}_ceiling_color*")
     )
     cm_scene_folders = sorted(
         cm_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
@@ -99,7 +99,7 @@ def get_input_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
     sort_nicely(cm_scene_folders)
 
     viz_scene_folders = glob.glob(
-        os.path.join(blender_scene_dir, f"{config.scene_name}*")
+        os.path.join(blender_scene_dir, f"{config.scene_name}_color*")
     )
     viz_scene_folders = sorted(
         viz_scene_folders, key=lambda x: float(re.findall("(\d+)", x)[0])
