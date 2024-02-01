@@ -16,7 +16,7 @@ class Config:
         return str(self.__dict__)
 
 
-def make_conf(conf_file: str) -> Dict[str, Union[str, float, bool]]:
+def make_conf(conf_file: str) -> Config:
     config = Config()
     config_kwargs = {}
     with open(conf_file, "r") as f:
