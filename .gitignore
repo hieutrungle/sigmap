@@ -5,7 +5,6 @@ logs/*
 *tmp*
 **/*.log
 **/*.zip
-**/*.sh
 **/*.in
 core.*
 *out.*
