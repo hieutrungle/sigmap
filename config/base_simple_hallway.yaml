@@ -42,7 +42,7 @@ device_end: ""
 # Ray tracing defaults
 cm_max_depth: 15
 cm_cell_size: [0.2, 0.2]
-cm_num_samples: 4e6
+cm_num_samples: 15e6
 path_max_depth: 2
 path_num_samples: 3e6
 diffraction: True
