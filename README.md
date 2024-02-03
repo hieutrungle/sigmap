@@ -6,15 +6,15 @@ Given a 3D mitsuba file format, this code computes the coverage maps of the stru
 
 Moreover, it computes the optimal angle and position of the RIS elements to:
 
-- maximize the received power at a receiver
-- optimize the data rate
+-   maximize the received power at a receiver
+-   optimize the data rate
 
 ## Installation
 
 Clone this repository and navigate to it in your terminal. Activate your environment. Then run:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
 Install local sigmap package:
@@ -27,7 +27,7 @@ pip install -e .
 
 ### Folder structure
 
-``` bash
+```bash
 sigmap
 ├── sigmap
 │   ├── data
@@ -53,8 +53,8 @@ sigmap
 
 In `assets/blender` directory, you have to provide the following:
 
-- `scene_celing_color.blend`: Blender scene with the ceiling of the structure on. This file is used to compute coverage maps even though they are not visible using visualization tools.
-- `scene_color.blend`: Blender scene with the ceiling of the structure off so that coverage maps can be seen (visualization purposes)
+-   `scene_celing_color.blend`: Blender scene with the ceiling of the structure on. This file is used to compute coverage maps even though they are not visible using visualization tools.
+-   `scene_color.blend`: Blender scene with the ceiling of the structure off so that coverage maps can be seen (visualization purposes)
 
 The other two directories `assets/images` and `assets/videos` are used to store the images and videos of the structure. They will be automatically created when running the code.
 
@@ -88,7 +88,7 @@ The other two directories `assets/images` and `assets/videos` are used to store 
 ### Compute coverage maps
 
 ```bash
-python sigmap/main.py 
+python sigmap/main.py
 ```
 
 ### Arguments
@@ -97,13 +97,13 @@ python sigmap/main.py
 
 ## Features
 
-- [x] Coverage Map - Sionna
-- [x] Coverage Map Visualization - Sionna
-- [x] Coverage Map Animation - ffmpeg
+-   [x] Coverage Map - Sionna
+-   [x] Coverage Map Visualization - Sionna
+-   [x] Coverage Map Animation - ffmpeg
 
 ## In Progress
 
-- [ ] Optimal Angle of RIS Elements to Maximize Received Power at a Receiver - Blender script
-- [ ] Optimal Position of RIS Elements to Adjust Delay in order to Have Constructive Interference at a Receiver - Blender script
-- [ ] Link Level Simulation - Sionna
-- [ ] Data Rate Optimization - Sionna
+-   [ ] Optimal Angle of RIS Elements to Maximize Received Power at a Receiver - Blender script
+-   [ ] Optimal Position of RIS Elements to Adjust Delay in order to Have Constructive Interference at a Receiver - Blender script
+-   [ ] Link Level Simulation - Sionna
+-   [ ] Data Rate Optimization - Sionna
