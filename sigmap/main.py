@@ -42,6 +42,7 @@ from sigmap.utils import logger, utils, timer, map_prep
 from sigmap.utils import utils, timer, logger, scripting_utils, video_gen
 from sigmap import compute
 import subprocess
+import tensorflow as tf
 
 
 def main():
@@ -50,6 +51,10 @@ def main():
     log_dir = "./tmp_logs"
     utils.mkdir_not_exists(log_dir)
     logger.configure(dir=log_dir)
+
+    logger.log(f"using tensorflow version: {tf.__version__}")
+    logger.log(f"is_gpu_available: {tf.config.list_physical_devices('GPU')}")
+
     if args.verbose:
         utils.log_args(args)
         utils.log_config(config)
