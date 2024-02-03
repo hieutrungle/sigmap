@@ -23,6 +23,16 @@ Install local sigmap package:
 pip install -e .
 ```
 
+## Prepare Blender with Mitsuba on Server without GUI
+
+### Blender
+
+-   Install Blender v3.3 on a local computer
+-   Install [mitsuba-blender](https://github.com/mitsuba-renderer/mitsuba-blender) add-on
+-   Install Blender v3.3 on a server without GUI
+-   Copy local $(HOME)/.config/blender/3.3/config/userpref.blend to server $(HOME)/.config/blender/3.3/config/userpref.blend
+-   Copy local $(HOME)/.config/blender/3.3/scripts/addons/mitsuba to server $(HOME)/.config/blender/3.3/scripts/addons/mitsuba
+
 ## Prepare data
 
 ### Folder structure
@@ -60,7 +70,18 @@ The other two directories `assets/images` and `assets/videos` are used to store 
 
 ## Run
 
-1. Export blender file to mitsuba file format
+```bash
+bash ./run_main.sh
+```
+
+This script does the following:
+
+-   Install all the required addons and python packages for Blender
+-   Modify the base configuration file with the position of the receiver
+-   Export blender file to mitsuba file format using a python script to configure RIS elements for beamforming
+-   Compute coverage maps using the exported mitsuba file and the modified configuration file
+
+<!-- 1. Export blender file to mitsuba file format
 
     ```bash
     BLENDER_DIR=${HOME}/blender
@@ -83,7 +104,7 @@ The other two directories `assets/images` and `assets/videos` are used to store 
 
     ```bash
     python ./sigmap/main.py -cfg ./config/simple_hallway.yaml --verbose --video_enabled
-    ```
+    ``` -->
 
 ### Compute coverage maps
 
