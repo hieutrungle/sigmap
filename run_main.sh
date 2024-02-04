@@ -30,8 +30,8 @@ BASE_CONFIG_FILE=${SIGMAP_DIR}/config/base_simple_hallway.yaml
 WORK_CONFIG_FILE=${SIGMAP_DIR}/config/simple_hallway_tmp.yaml
 
 
-xs=($(seq -15.0 3.0 -14.1))
-ys=($(seq -2.5 -1.5 -3.0))
+xs=($(seq -15.0 0.5 -1.0))
+ys=($(seq -2.5 -0.25 -4.5))
 idx=0
 
 for file in ${BLENDER_DIR}/*
