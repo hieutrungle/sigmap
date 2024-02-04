@@ -26,11 +26,11 @@ def create_filename(dir: str, filename: str) -> str:
     i = 0
     while os.path.exists(tmp_filename):
         i += 1
-        name = filename.split(".")[0]
-        # if is numeric
-        if name[-3:].isdigit():
-            name = name[:-3]
-        ext = filename.split(".")[1]
+        ext = filename.rpartition(".")[2]
+        name = filename.rpartition(".")[0]
+        name = re.sub(r"\d+$", "", name)
+        while name[-1] == "_":
+            name = name[:-1]
         tmp_filename = name + f"_{i:03d}." + ext
     filename = tmp_filename
     return filename
