@@ -108,13 +108,40 @@ This script does the following:
 
 ### Compute coverage maps
 
+#### Use Automation Bash Script
+
 ```bash
-python sigmap/main.py
+bash ./run_main.sh
+```
+
+#### Run Manually
+
+```bash
+python sigmap/main.py --options
+```
+
+### Video Generation
+
+```bash
+ffmpeg -framerate 5 -i {PATH_TO_IMAGES}_%03d.png -r 30 -pix_fmt yuv420p {OUTPUT_VIDEO_PATH}.mp4
+```
+
+Example:
+
+```bash
+ffmpeg -framerate 5 -i ./images/tmp_beamfocusing_simple_hallway/hallway_%03d.png -r 30 -pix_fmt yuv420p ./videos/beamfocusing_fr_5.mp4
 ```
 
 ### Arguments
 
-[TODO] Add arguments
+`main.py` has the following arguments:
+
+-   `--config`, `-cfg`: Path to the configuration file
+-   `--verbose`, `-v`: Print debug information
+-   `--video_enabled`: Generate video
+-   `--index`: temporary index to retrieve the correct blender scenes
+
+Informaation for CLI arguments of blender scripts are located in `blender_script/README.md`
 
 ## Features
 
