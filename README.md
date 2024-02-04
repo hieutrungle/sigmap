@@ -136,12 +136,12 @@ ffmpeg -framerate 5 -i ./images/tmp_beamfocusing_simple_hallway/hallway_%03d.png
 
 `main.py` has the following arguments:
 
--   `--config`, `-cfg`: Path to the configuration file
+-   `--config_file`, `-cfg`: Path to the configuration file
 -   `--verbose`, `-v`: Print debug information
 -   `--video_enabled`: Generate video
 -   `--index`: temporary index to retrieve the correct blender scenes
 
-Informaation for CLI arguments of blender scripts are located in `blender_script/README.md`
+Informaation for CLI arguments of blender scripts are located in [blender_script/README.md](./sigmap/blender_script/README.md)
 
 ## Features
 
