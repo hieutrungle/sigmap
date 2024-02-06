@@ -38,6 +38,8 @@ blender_folder = glob.glob(f"{blender_dir}/blender-{blender_version}*")[0]
 python_exec = os.path.join(blender_folder, blender_version, "python", "bin")
 python_exec = glob.glob(os.path.join(python_exec, "python3*"))[0]
 # print(f"python_exec: {python_exec}")
+subprocess.run([python_exec, "-m", "ensurepip"])
+subprocess.run([python_exec, "-m", "pip", "install", "--upgrade", "pip"])
 subprocess.run([python_exec, "-m", "pip", "install", "mitsuba"])
 subprocess.run([python_exec, "-m", "pip", "install", "PyYAML"])
 
