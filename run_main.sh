@@ -29,11 +29,7 @@ echo -e Assets directory: $ASSETS_DIR '\n'
 BASE_CONFIG_FILE=${SIGMAP_DIR}/config/base_simple_hallway.yaml
 WORK_CONFIG_FILE=${SIGMAP_DIR}/config/simple_hallway_tmp.yaml
 
-
-xs=($(seq -15.0 0.5 -1.0))
-ys=($(seq -2.5 -0.25 -4.5))
-idx=0
-
+# Find the blender executable
 for file in ${BLENDER_DIR}/*
 do
     if [[ "$file" == *"blender-3.3"* ]];then
@@ -42,9 +38,23 @@ do
 done
 
 # Open a random blender file to install and enable the mitsuba plugin
+mkdir -p ${BLENDER_DIR}/addons
+if [ ! -f ${BLENDER_DIR}/addons/mitsuba*.zip ]; then
+    wget -P ${BLENDER_DIR}/addons https://github.com/mitsuba-renderer/mitsuba-blender/releases/download/v0.3.0/mitsuba-blender.zip 
+    # unzip mitsuba-blender.zip -d ${BLENDER_DIR}/addons
+fi
 ${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SIGMAP_DIR}/sigmap/blender_script/install_mitsuba_addon.py
 
+# get scene_name from BASE_CONFIG_FILE
+SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
 
+# Setting up the environment
+num_samples=10e6
+
+# Main loop to compute the coverage map
+xs=($(seq -15.0 0.5 -14.0))
+ys=($(seq -2.5 -0.25 -4.5))
+idx=0
 for x in ${xs[@]}; do
     ys=( $(printf '%s\n' "${ys[@]}" | tac) )
     for y in ${ys[@]}; do
@@ -53,7 +63,7 @@ for x in ${xs[@]}; do
         # Modify configuration file
         echo -e 'Modifying configuration file...'
         python ${SIGMAP_DIR}/sigmap/blender_script/modify_config.py -cfg ${BASE_CONFIG_FILE} \
-            --output ${WORK_CONFIG_FILE} --rx_position " ${x}" " ${y}" 1.5
+            --output ${WORK_CONFIG_FILE} --rx_position " ${x}" " ${y}" 1.5 --num_samples "${num_samples}"
         echo -e 'Finished modifying configuration file\n'
 
         # Perform the export of the mitsuba scene using the blender script
@@ -65,14 +75,31 @@ for x in ${xs[@]}; do
                 --index ${idx}
         echo -e 'Finished exporting mitsuba scene\n'
 
+        # Find the scene path with correct index
+        COMPUTE_SCENE_PATH=$(find ${ASSETS_DIR}/blender/${SCENE_NAME} -type d -name "ceiling_idx_${idx}*")
+        COMPUTE_SCENE_PATH=$(find "${COMPUTE_SCENE_PATH}" -type f -name "*.xml")
+        VIZ_SCENE_PATH=$(find ${ASSETS_DIR}/blender/${SCENE_NAME} -type d -name "idx_${idx}*")
+        VIZ_SCENE_PATH=$(find "${VIZ_SCENE_PATH}" -type f -name "*.xml")
+        echo "Compute scene path: $COMPUTE_SCENE_PATH"
+        echo "Viz scene path: $VIZ_SCENE_PATH"
+
         # Compute the coverage map
         echo Compute coverage map...
         python ${SIGMAP_DIR}/sigmap/main.py -cfg ${WORK_CONFIG_FILE}  \
-            --index ${idx} \
-            --verbose \
+            --compute_scene_path "${COMPUTE_SCENE_PATH}" \
+            --viz_scene_path "${VIZ_SCENE_PATH}" \
+            --cmap_enabled \
+            --verbose
             # --video_enabled
         echo -e 'Finished computing coverage map\n'
 
+        # # Clean up generated files
+        # echo Cleaning up generated files...
+        # rm -rf ${ASSETS_DIR}/blender
+        # echo -e 'Finished cleaning up generated files\n'
+
         idx=$((idx+1))
+        break
     done
+    break
 done
