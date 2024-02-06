@@ -49,11 +49,11 @@ ${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SI
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
 
 # Setting up the environment
-num_samples=2e6
+num_samples=10e6
 
 # Main loop to compute the coverage map
-xs=($(seq -15.0 0.5 -1.0))
-ys=($(seq -2.5 -0.25 -4.5))
+xs=($(seq -15.0 0.5 -2.0))
+ys=($(seq -2.5 -0.2 -4.5))
 idx=0
 for x in ${xs[@]}; do
     ys=( $(printf '%s\n' "${ys[@]}" | tac) )
