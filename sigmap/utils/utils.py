@@ -31,7 +31,7 @@ def create_filename(dir: str, filename: str) -> str:
         name = re.sub(r"\d+$", "", name)
         while name[-1] == "_":
             name = name[:-1]
-        tmp_filename = name + f"_{i:03d}." + ext
+        tmp_filename = name + f"_{i:05d}." + ext
     filename = tmp_filename
     return filename
 
@@ -124,16 +124,28 @@ def get_input_folders(
     return (cm_scene_folders, viz_scene_folders)
 
 
-def get_output_folders(config: Dict[str, Union[str, float, bool]]) -> Tuple[str]:
+def get_source_dir() -> str:
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    parent_dir = os.path.dirname(os.path.dirname(current_dir))
-    asset_dir = os.path.join(parent_dir, "assets")
+    source_dir = os.path.dirname(os.path.dirname(current_dir))
+    return source_dir
 
-    img_folder = os.path.join(asset_dir, "images")
-    mkdir_not_exists(img_folder)
-    img_tmp_folder = os.path.join(img_folder, f"tmp_{config.scene_name}")
-    mkdir_not_exists(img_tmp_folder)
-    video_folder = os.path.join(asset_dir, "videos")
-    mkdir_not_exists(video_folder)
 
-    return (img_folder, img_tmp_folder, video_folder)
+def get_asset_dir() -> str:
+    source_dir = get_source_dir()
+    assets_dir = os.path.join(source_dir, "assets")
+    return assets_dir
+
+
+def get_image_dir(config: Dict[str, Union[str, float, bool]]) -> str:
+    assets_dir = get_asset_dir()
+    img_dir = os.path.join(assets_dir, "images", f"{config.scene_name}")
+    mkdir_not_exists(img_dir)
+
+    return img_dir
+
+
+def get_video_dir(config: Dict[str, Union[str, float, bool]]) -> str:
+    assets_dir = get_asset_dir()
+    video_dir = os.path.join(assets_dir, "videos")
+    mkdir_not_exists(video_dir)
+    return video_dir

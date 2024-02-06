@@ -53,15 +53,18 @@ def main():
     logger.configure(dir=log_dir)
 
     logger.log(f"using tensorflow version: {tf.__version__}")
-    logger.log(f"is_gpu_available: {tf.config.list_physical_devices('GPU')}")
+    if tf.config.list_physical_devices("GPU") == []:
+        logger.log(f"no GPU available\n")
+    else:
+        logger.log(f"Available GPUs: {tf.config.list_physical_devices('GPU')}\n")
 
     if args.verbose:
         utils.log_args(args)
         utils.log_config(config)
 
     # Prepare folders
-    img_folder, img_tmp_folder, video_folder = utils.get_output_folders(config)
-    compute.coverage_map.compute_coverage_map(args, config)
+    sig_cmap = compute.signal_cmap.SignalCoverageMap(args, config)
+    sig_cmap.compute_render(cm_enabled=False, paths_enabled=False)
 
     # Create video
     if args.video_enabled:
@@ -69,7 +72,9 @@ def main():
         with timer.Timer(
             text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
         ):
-            video_gen.create_video(img_tmp_folder, video_folder, config)
+            img_dir = utils.get_image_dir(config)
+            video_dir = utils.get_video_dir(config)
+            video_gen.create_video(img_dir, video_dir, config)
 
 
 def create_args() -> argparse.ArgumentParser:
