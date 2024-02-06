@@ -46,7 +46,7 @@ import tensorflow as tf
 
 
 def main():
-    args = create_argparser().parse_args()
+    args = create_args()
     config = scripting_utils.make_conf(args.config_file)
     log_dir = "./tmp_logs"
     utils.mkdir_not_exists(log_dir)
@@ -72,17 +72,21 @@ def main():
             video_gen.create_video(img_tmp_folder, video_folder, config)
 
 
-def create_argparser() -> argparse.ArgumentParser:
+def create_args() -> argparse.ArgumentParser:
     """Parses command line arguments."""
     defaults = dict()
     # defaults.update(utils.rt_defaults())
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
+    parser.add_argument("--compute_scene_path", "-cp", type=str, required=True)
+    parser.add_argument("--viz_scene_path", "-vp", type=str)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
     parser.add_argument("--video_enabled", action="store_true", default=False)
-    parser.add_argument("--index", type=int, default=0)
     scripting_utils.add_dict_to_argparser(parser, defaults)
-    return parser
+    args = parser.parse_args()
+    if args.viz_scene_path is None or args.viz_scene_path == "":
+        args.viz_scene_path = args.compute_scene_path
+    return args
 
 
 if __name__ == "__main__":
