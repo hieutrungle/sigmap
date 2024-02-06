@@ -79,7 +79,7 @@ def create_argparser() -> bl_parser.ArgumentParserForBlender:
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
     parser.add_argument("--output_dir", "-o", type=str, required=True)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
-    parser.add_argument("--index", type=int, default=0)
+    parser.add_argument("--index", type=str)
     return parser
 
 

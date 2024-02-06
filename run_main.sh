@@ -49,15 +49,16 @@ ${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SI
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
 
 # Setting up the environment
-num_samples=10e6
+num_samples=2e6
 
 # Main loop to compute the coverage map
-xs=($(seq -15.0 0.5 -14.0))
+xs=($(seq -15.0 0.5 -1.0))
 ys=($(seq -2.5 -0.25 -4.5))
 idx=0
 for x in ${xs[@]}; do
     ys=( $(printf '%s\n' "${ys[@]}" | tac) )
     for y in ${ys[@]}; do
+        idx_str=$(printf "%05d" ${idx})
         echo "x: $x, y: $y"
         
         # Modify configuration file
@@ -72,13 +73,13 @@ for x in ${xs[@]}; do
             -b ${BLENDER_DIR}/models/simple_hallway_color.blend \
             --python ${SIGMAP_DIR}/sigmap/blender_script/hallway.py \
                 -- -cfg ${WORK_CONFIG_FILE} -o ${ASSETS_DIR}/blender \
-                --index ${idx}
+                --index ${idx_str}
         echo -e 'Finished exporting mitsuba scene\n'
 
         # Find the scene path with correct index
-        COMPUTE_SCENE_PATH=$(find ${ASSETS_DIR}/blender/${SCENE_NAME} -type d -name "ceiling_idx_${idx}*")
+        COMPUTE_SCENE_PATH=$(find ${ASSETS_DIR}/blender/${SCENE_NAME} -type d -name "ceiling_idx_${idx_str}*")
         COMPUTE_SCENE_PATH=$(find "${COMPUTE_SCENE_PATH}" -type f -name "*.xml")
-        VIZ_SCENE_PATH=$(find ${ASSETS_DIR}/blender/${SCENE_NAME} -type d -name "idx_${idx}*")
+        VIZ_SCENE_PATH=$(find ${ASSETS_DIR}/blender/${SCENE_NAME} -type d -name "idx_${idx_str}*")
         VIZ_SCENE_PATH=$(find "${VIZ_SCENE_PATH}" -type f -name "*.xml")
         echo "Compute scene path: $COMPUTE_SCENE_PATH"
         echo "Viz scene path: $VIZ_SCENE_PATH"
@@ -99,7 +100,5 @@ for x in ${xs[@]}; do
         # echo -e 'Finished cleaning up generated files\n'
 
         idx=$((idx+1))
-        break
     done
-    break
 done
