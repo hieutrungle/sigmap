@@ -40,8 +40,8 @@ python_exec = glob.glob(os.path.join(python_exec, "python3*"))[0]
 # print(f"python_exec: {python_exec}")
 subprocess.run([python_exec, "-m", "ensurepip"])
 subprocess.run([python_exec, "-m", "pip", "install", "--upgrade", "pip"])
-subprocess.run([python_exec, "-m", "pip", "install", "mitsuba"])
-subprocess.run([python_exec, "-m", "pip", "install", "PyYAML"])
+subprocess.run([python_exec, "-m", "pip", "install", "mitsuba==3.4.1"])
+subprocess.run([python_exec, "-m", "pip", "install", "--upgrade", "PyYAML"])
 
 # Specify which add-ons you want enabled. For example, Crowd Render, Pie Menu Editor, etc. Use the script's python module.
 enableTheseAddons = ["mitsuba-blender"]

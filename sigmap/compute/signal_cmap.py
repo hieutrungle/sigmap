@@ -47,11 +47,11 @@ class SignalCoverageMap:
         return paths
 
     def compute_render(
-        self, cm_enabled: bool = False, paths_enabled: bool = False
+        self, cmap_enabled: bool = False, paths_enabled: bool = False
     ) -> None:
 
         # Visualize coverage maps with ceiling off
-        if cm_enabled:
+        if cmap_enabled:
             cm = self.compute_cmap()
         else:
             cm = None

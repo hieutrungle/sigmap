@@ -64,7 +64,9 @@ def main():
 
     # Prepare folders
     sig_cmap = compute.signal_cmap.SignalCoverageMap(args, config)
-    sig_cmap.compute_render(cm_enabled=False, paths_enabled=False)
+    sig_cmap.compute_render(
+        cmap_enabled=args.cmap_enabled, paths_enabled=args.paths_enabled
+    )
 
     # Create video
     if args.video_enabled:
@@ -85,6 +87,8 @@ def create_args() -> argparse.ArgumentParser:
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
     parser.add_argument("--compute_scene_path", "-cp", type=str, required=True)
     parser.add_argument("--viz_scene_path", "-vp", type=str)
+    parser.add_argument("--cmap_enabled", action="store_true", default=False)
+    parser.add_argument("--paths_enabled", action="store_true", default=False)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
     parser.add_argument("--video_enabled", action="store_true", default=False)
     scripting_utils.add_dict_to_argparser(parser, defaults)
