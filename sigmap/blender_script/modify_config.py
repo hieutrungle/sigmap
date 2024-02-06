@@ -1,6 +1,7 @@
 import yaml
 import argparse
 import os
+import re
 
 
 def main():
@@ -8,6 +9,12 @@ def main():
     with open(args.config_file) as istream:
         ymldoc = yaml.safe_load(istream)
         ymldoc["rx_position"] = args.rx_position
+        if re.match(r"^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$", args.num_samples):
+            ymldoc["cm_num_samples"] = int(float(args.num_samples))
+        elif args.num_samples.isnumeric():
+            ymldoc["cm_num_samples"] = int(args.num_samples)
+        else:
+            raise ValueError("num_samples must be a number")
 
     # add tmp to args.config_file
     tmp_file = args.config_file.split(".")[0] + "_tmp.yaml"
@@ -31,6 +38,7 @@ def create_argparser() -> argparse.ArgumentParser:
         default=[0, 0, 0],  # default if nothing is provided
         required=True,
     )
+    parser.add_argument("--num_samples", "-ns", type=str, default="1e6")
     return parser
 
 
