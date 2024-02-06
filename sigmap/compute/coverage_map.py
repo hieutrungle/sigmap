@@ -57,12 +57,3 @@ def compute_coverage_map(args, config):
             )
             # render_config["show_devices"] = True
             scene.render_to_file(**render_config)
-
-
-class SignalCoverageMap:
-    def __init__(self, args, config):
-        self.args = args
-        self.config = config
-
-    def compute_cmap(self):
-        pass
