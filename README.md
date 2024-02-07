@@ -123,13 +123,13 @@ python sigmap/main.py --options
 ### Video Generation
 
 ```bash
-ffmpeg -framerate 5 -i {PATH_TO_IMAGES}_%03d.png -r 30 -pix_fmt yuv420p {OUTPUT_VIDEO_PATH}.mp4
+ffmpeg -framerate 5 -i {PATH_TO_IMAGES}_%05d.png -r 30 -pix_fmt yuv420p {OUTPUT_VIDEO_PATH}.mp4
 ```
 
 Example:
 
 ```bash
-ffmpeg -framerate 5 -i ./images/tmp_beamfocusing_simple_hallway/hallway_%03d.png -r 30 -pix_fmt yuv420p ./videos/beamfocusing_fr_5.mp4
+ffmpeg -framerate 5 -i ./images/tmp_beamfocusing_simple_hallway/hallway_%05d.png -r 30 -pix_fmt yuv420p ./videos/beamfocusing_fr_5.mp4
 ```
 
 ### Arguments
