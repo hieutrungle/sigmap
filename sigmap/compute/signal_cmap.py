@@ -21,29 +21,37 @@ class SignalCoverageMap:
     @timer.Timer(
         text="Elapsed coverage map time: {:0.4f} seconds\n", logger_fn=logger.log
     )
-    def compute_cmap(self) -> sionna.rt.CoverageMap:
+    def compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
         # Compute coverage maps with ceiling on
         logger.log(f"Computing coverage map for {self.compute_scene_path}")
         scene = map_prep.prepare_scene(self.config, self.compute_scene_path, self.cam)
 
-        cm = scene.coverage_map(
+        cm_kwargs = dict(
             max_depth=self.config.cm_max_depth,
             cm_cell_size=self.config.cm_cell_size,
             num_samples=self.config.cm_num_samples,
             diffraction=self.config.diffraction,
         )
+        if kwargs:
+            cm_kwargs.update(kwargs)
+
+        cm = scene.coverage_map(cm_kwargs)
         return cm
 
     @timer.Timer(text="Elapsed paths time: {:0.4f} seconds\n", logger_fn=logger.log)
-    def compute_paths(self) -> sionna.rt.Paths:
+    def compute_paths(self, **kwargs) -> sionna.rt.Paths:
         # Compute coverage maps with ceiling on
         logger.log(f"Computing paths for {self.compute_scene_path}")
         scene = map_prep.prepare_scene(self.config, self.compute_scene_path, self.cam)
 
-        paths = scene.compute_paths(
+        paths_kwargs = dict(
             max_depth=self.config.path_max_depth,
             num_samples=self.config.path_num_samples,
         )
+        if kwargs:
+            paths_kwargs.update(kwargs)
+
+        paths = scene.compute_paths(**paths_kwargs)
         return paths
 
     def compute_render(
@@ -77,3 +85,7 @@ class SignalCoverageMap:
             show_devices=True,
         )
         scene.render_to_file(**render_config)
+
+    def get_viz_scene(self) -> sionna.rt.Scene:
+        scene = map_prep.prepare_scene(self.config, self.viz_scene_path, self.cam)
+        return scene
