@@ -5,26 +5,29 @@ import sionna.rt
 
 class SignalCoverageMap:
     def __init__(self, args, config):
-        self.args = args
         self.config = config
 
         # input directories
-        self.compute_scene_path = args.compute_scene_path
-        self.viz_scene_path = args.viz_scene_path
+        self._compute_scene_path = args.compute_scene_path
+        self._viz_scene_path = args.viz_scene_path
 
         # output directories
         self.img_dir = utils.get_image_dir(config)
 
         # Camera
-        self.cam = map_prep.prepare_camera(self.config)
+        self._cam = map_prep.prepare_camera(self.config)
+
+    @property
+    def cam(self):
+        return self._cam
 
     @timer.Timer(
         text="Elapsed coverage map time: {:0.4f} seconds\n", logger_fn=logger.log
     )
     def compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
         # Compute coverage maps with ceiling on
-        logger.log(f"Computing coverage map for {self.compute_scene_path}")
-        scene = map_prep.prepare_scene(self.config, self.compute_scene_path, self.cam)
+        logger.log(f"Computing coverage map for {self._compute_scene_path}")
+        scene = map_prep.prepare_scene(self.config, self._compute_scene_path, self.cam)
 
         cm_kwargs = dict(
             max_depth=self.config.cm_max_depth,
@@ -41,8 +44,8 @@ class SignalCoverageMap:
     @timer.Timer(text="Elapsed paths time: {:0.4f} seconds\n", logger_fn=logger.log)
     def compute_paths(self, **kwargs) -> sionna.rt.Paths:
         # Compute coverage maps with ceiling on
-        logger.log(f"Computing paths for {self.compute_scene_path}")
-        scene = map_prep.prepare_scene(self.config, self.compute_scene_path, self.cam)
+        logger.log(f"Computing paths for {self._compute_scene_path}")
+        scene = map_prep.prepare_scene(self.config, self._compute_scene_path, self.cam)
 
         paths_kwargs = dict(
             max_depth=self.config.path_max_depth,
@@ -69,7 +72,7 @@ class SignalCoverageMap:
         else:
             paths = None
 
-        scene = map_prep.prepare_scene(self.config, self.viz_scene_path, self.cam)
+        scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
 
         render_filename = utils.create_filename(
             self.img_dir, f"{self.config.mitsuba_filename}_00000.png"
@@ -87,5 +90,5 @@ class SignalCoverageMap:
         scene.render_to_file(**render_config)
 
     def get_viz_scene(self) -> sionna.rt.Scene:
-        scene = map_prep.prepare_scene(self.config, self.viz_scene_path, self.cam)
+        scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
         return scene
