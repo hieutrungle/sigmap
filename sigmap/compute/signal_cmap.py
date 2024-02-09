@@ -35,8 +35,8 @@ class SignalCoverageMap:
         if kwargs:
             cm_kwargs.update(kwargs)
 
-        cm = scene.coverage_map(cm_kwargs)
-        return cm
+        cmap = scene.coverage_map(**cm_kwargs)
+        return cmap
 
     @timer.Timer(text="Elapsed paths time: {:0.4f} seconds\n", logger_fn=logger.log)
     def compute_paths(self, **kwargs) -> sionna.rt.Paths:
