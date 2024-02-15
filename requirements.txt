@@ -5,3 +5,6 @@ sionna
 tensorflow[and-cuda]
 jax[cuda12_pip]
 PyYAML
+torch
+torchvision
+torchaudio
