@@ -102,13 +102,13 @@ def save_mitsuba_xml(folder_dir, filename, collections):
     )
 
 
-def get_bisector_pt(tile_center: Vector, tx_pos: Vector, rx_pos: Vector) -> Vector:
+def get_bisector_pt(pt1: Vector, pt2: Vector, pt3: Vector) -> Vector:
     """
     Get the bisector point of the line between tx and rx.
 
-    tile_center: A
-    tx_pos: B
-    rx_pos: C
+    pt1: B
+    pt2: A
+    pt3: C
     bisector_pt: D
 
     ratio = -|AB|/|AC|
@@ -119,11 +119,18 @@ def get_bisector_pt(tile_center: Vector, tx_pos: Vector, rx_pos: Vector) -> Vect
     y_D = 1/(1 - ratio) * (y_B - ratio * y_C) \n
     z_D = 1/(1 - ratio) * (z_B - ratio * z_C)
     """
-    tile_tx_len = (tx_pos - tile_center).length  # |AB|
-    tile_rx_len = (rx_pos - tile_center).length  # |AC|
+    tile_tx_len = (pt1 - pt2).length  # |AB|
+    tile_rx_len = (pt3 - pt2).length  # |AC|
     ratio = -tile_tx_len / tile_rx_len
-    bisector_pt = 1 / (1 - ratio) * (tx_pos - ratio * rx_pos)
+    bisector_pt = 1 / (1 - ratio) * (pt1 - ratio * pt3)
     return bisector_pt
+
+
+def get_center_bbox(tile: bpy.types.Object) -> Vector:
+    """Get the center of the bounding box of the tile."""
+    local_bbox_center = 0.125 * sum((Vector(b) for b in tile.bound_box), Vector())
+    global_bbox_center = tile.matrix_world @ local_bbox_center
+    return global_bbox_center
 
 
 def get_midpoint(pt1, pt2):
@@ -133,19 +140,20 @@ def get_midpoint(pt1, pt2):
     return [x, y, z]
 
 
-def compute_rot_angle_txrx(
-    tile_center: list,
-    tx_pos: list,
-    rx_pos: list,
+def compute_rot_angle_3pts(
+    pt1: list,
+    pt2: list,
+    pt3: list,
 ) -> Tuple[float, float, float]:
-    """Compute the rotation angles for the tile.
+    """Compute the rotation angles for the pt2.
+    The three point forms a triangle, we compute the rotation angles for the pt2.
     return: (r, theta, phi)
         `r`: distance from the tile center to the midpoint of tx and rx
         `theta`: rotation in y-axis
         `phi`: rotation in z-axis
     """
-    midpoint = get_bisector_pt(Vector(tile_center), Vector(tx_pos), Vector(rx_pos))
-    return compute_rot_angle(tile_center, midpoint)
+    midpoint = get_bisector_pt(Vector(pt1), Vector(pt2), Vector(pt3))
+    return compute_rot_angle(pt2, midpoint)
 
 
 def compute_rot_angle(

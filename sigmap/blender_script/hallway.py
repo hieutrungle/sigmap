@@ -15,52 +15,164 @@ import bl_utils, bl_parser
 
 
 def export_beamfocusing_simple_hallway(args, config):
-    # Collection
-    tiles = bpy.data.collections["Reflector"].objects
+    # # Collection
+    # tiles = bpy.data.collections["Reflector"].objects
 
-    for frame in range(1, 2):
-        for tile in tiles:
-            local_bbox_center = 0.125 * sum(
-                (Vector(b) for b in tile.bound_box), Vector()
+    # for frame in range(1, 2):
+    #     for tile in tiles:
+    #         # local_bbox_center = 0.125 * sum(
+    #         #     (Vector(b) for b in tile.bound_box), Vector()
+    #         # )
+    #         # global_bbox_center = tile.matrix_world @ local_bbox_center
+    #         global_bbox_center = bl_utils.get_center_bbox(tile)
+
+    #         # Compute rotation angles
+    #         r, theta, phi = bl_utils.compute_rot_angle_3pts(
+    #             config.tx_position, global_bbox_center, config.rx_position
+    #         )
+
+    #         tile.rotation_euler = [0, theta, phi]
+    #         tile.scale = [0.1, 0.1, 0.02]
+
+    #     # Saving to mitsuba format for Sionna
+    #     print(
+    #         f"\nsaving with index: {args.index},  rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
+    #     )
+
+    #     # Save files without ceiling
+    #     folder_dir = os.path.join(
+    #         args.output_dir,
+    #         f"{config.scene_name}",
+    #         f"idx_{args.index}_rx_pos_{config.rx_position}",
+    #     )
+    #     bl_utils.mkdir_with_replacement(folder_dir)
+    #     bl_utils.save_mitsuba_xml(
+    #         folder_dir, config.mitsuba_filename, ["Reflector", "Wall", "Floor"]
+    #     )
+
+    #     # Save files with ceiling
+    #     folder_dir = os.path.join(
+    #         args.output_dir,
+    #         f"{config.scene_name}",
+    #         f"ceiling_idx_{args.index}_rx_pos_{config.rx_position}",
+    #     )
+    #     bl_utils.mkdir_with_replacement(folder_dir)
+    #     bl_utils.save_mitsuba_xml(
+    #         folder_dir,
+    #         config.mitsuba_filename,
+    #         ["Reflector", "Wall", "Floor", "Ceiling"],
+    #     )
+
+    devices = []
+    devices_names = []
+    for k, v in bpy.data.collections.items():
+        if "Reflector" in k:
+            devices_names.append(k)
+            devices.append(v.objects)
+
+    for tile_tuple in zip(*devices):
+        global_bbox_centers = []
+        for i, tile in enumerate(tile_tuple):
+            if i == 0:
+                global_bbox_centers.append(config.tx_position)
+            global_bbox_centers.append(bl_utils.get_center_bbox(tile))
+            if i == len(tile_tuple) - 1:
+                global_bbox_centers.append(config.rx_position)
+
+        for i in range(len(tile_tuple)):
+            r, theta, phi = bl_utils.compute_rot_angle_3pts(
+                global_bbox_centers[i],
+                global_bbox_centers[i + 1],
+                global_bbox_centers[i + 2],
             )
-            global_bbox_center = tile.matrix_world @ local_bbox_center
+            tile_tuple[i].rotation_euler = [0, theta, phi]
+            tile_tuple[i].scale = [0.1, 0.1, 0.01]
 
-            # Compute rotation angles
-            r, theta, phi = bl_utils.compute_rot_angle_txrx(
-                global_bbox_center, config.tx_position, config.rx_position
+    # Saving to mitsuba format for Sionna
+    print(
+        f"\nsaving with index: {args.index},  rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
+    )
+
+    # Save files without ceiling
+    folder_dir = os.path.join(
+        args.output_dir,
+        f"{config.scene_name}",
+        f"idx_{args.index}_rx_pos_{config.rx_position}",
+    )
+    bl_utils.mkdir_with_replacement(folder_dir)
+    bl_utils.save_mitsuba_xml(
+        folder_dir, config.mitsuba_filename, [*devices_names, "Wall", "Floor"]
+    )
+
+    # Save files with ceiling
+    folder_dir = os.path.join(
+        args.output_dir,
+        f"{config.scene_name}",
+        f"ceiling_idx_{args.index}_rx_pos_{config.rx_position}",
+    )
+    bl_utils.mkdir_with_replacement(folder_dir)
+    bl_utils.save_mitsuba_xml(
+        folder_dir,
+        config.mitsuba_filename,
+        [*devices_names, "Wall", "Floor", "Ceiling"],
+    )
+
+
+def export_beamfocusing_tee_hallway(args, config):
+
+    devices = []
+    devices_names = []
+    for k, v in bpy.data.collections.items():
+        if "Reflector" in k:
+            devices_names.append(k)
+            devices.append(v.objects)
+
+    for tile_tuple in zip(*devices):
+        global_bbox_centers = []
+        for i, tile in enumerate(tile_tuple):
+            if i == 0:
+                global_bbox_centers.append(config.tx_position)
+            global_bbox_centers.append(bl_utils.get_center_bbox(tile))
+            if i == len(tile_tuple) - 1:
+                global_bbox_centers.append(config.rx_position)
+
+        for i in range(len(tile_tuple)):
+            r, theta, phi = bl_utils.compute_rot_angle_3pts(
+                global_bbox_centers[i],
+                global_bbox_centers[i + 1],
+                global_bbox_centers[i + 2],
             )
+            tile_tuple[i].rotation_euler = [0, theta, phi]
+            tile_tuple[i].scale = [0.1, 0.1, 0.01]
 
-            tile.rotation_euler = [0, theta, phi]
-            tile.scale = [0.1, 0.1, 0.02]
+    # Saving to mitsuba format for Sionna
+    print(
+        f"\nsaving with index: {args.index},  rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
+    )
 
-        # Saving to mitsuba format for Sionna
-        print(
-            f"\nsaving with index: {args.index},  rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
-        )
+    # Save files without ceiling
+    folder_dir = os.path.join(
+        args.output_dir,
+        f"{config.scene_name}",
+        f"idx_{args.index}_rx_pos_{config.rx_position}",
+    )
+    bl_utils.mkdir_with_replacement(folder_dir)
+    bl_utils.save_mitsuba_xml(
+        folder_dir, config.mitsuba_filename, [*devices_names, "Wall", "Floor"]
+    )
 
-        # Save files without ceiling
-        folder_dir = os.path.join(
-            args.output_dir,
-            f"{config.scene_name}",
-            f"idx_{args.index}_rx_pos_{config.rx_position}",
-        )
-        bl_utils.mkdir_with_replacement(folder_dir)
-        bl_utils.save_mitsuba_xml(
-            folder_dir, config.mitsuba_filename, ["Reflector", "Wall", "Floor"]
-        )
-
-        # Save files with ceiling
-        folder_dir = os.path.join(
-            args.output_dir,
-            f"{config.scene_name}",
-            f"ceiling_idx_{args.index}_rx_pos_{config.rx_position}",
-        )
-        bl_utils.mkdir_with_replacement(folder_dir)
-        bl_utils.save_mitsuba_xml(
-            folder_dir,
-            config.mitsuba_filename,
-            ["Reflector", "Wall", "Floor", "Ceiling"],
-        )
+    # Save files with ceiling
+    folder_dir = os.path.join(
+        args.output_dir,
+        f"{config.scene_name}",
+        f"ceiling_idx_{args.index}_rx_pos_{config.rx_position}",
+    )
+    bl_utils.mkdir_with_replacement(folder_dir)
+    bl_utils.save_mitsuba_xml(
+        folder_dir,
+        config.mitsuba_filename,
+        [*devices_names, "Wall", "Floor", "Ceiling"],
+    )
 
 
 def main():
@@ -69,6 +181,8 @@ def main():
 
     if config.scene_name == "beamfocusing_simple_hallway":
         export_beamfocusing_simple_hallway(args, config)
+    elif config.scene_name == "beamfocusing_tee_hallway":
+        export_beamfocusing_tee_hallway(args, config)
     else:
         raise ValueError(f"Unknown scene name: {config.scene_name}")
 
