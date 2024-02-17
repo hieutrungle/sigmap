@@ -71,7 +71,7 @@ def export_beamfocusing_simple_hallway(args, config):
             devices.append(v.objects)
 
     for tile_tuple in zip(*devices):
-        
+
         # [tx_pos, tile_center_1, tile_center_2, ..., rx_pos]
         global_bbox_centers = []
         for i, tile in enumerate(tile_tuple):
