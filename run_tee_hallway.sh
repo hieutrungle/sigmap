@@ -60,15 +60,17 @@ ${BLENDER_APP} -b ${BLENDER_DIR}/models/tee_hallway_color.blend --python ${SIGMA
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
 
 # Setting up the environment
-num_samples=4e6
+num_samples=10e6
 
 # Main loop to compute the coverage map
-xs=($(seq -4.25 -7.25 -6.0))
-ys=($(seq -5.0 -5.00 -13.0))
+# xs=($(seq -4.25 -0.25 -6.0))
+xs=($(seq -6.0 0.25 -4.25))
+ys=($(seq -5.0 -0.25 -13.0))
 idx=0
-for x in ${xs[@]}; do
-    ys=( $(printf '%s\n' "${ys[@]}" | tac) )
-    for y in ${ys[@]}; do
+for y in ${ys[@]}; do
+    xs=( $(printf '%s\n' "${xs[@]}" | tac) )
+    # ys=( $(printf '%s\n' "${ys[@]}" | tac) )
+    for x in ${xs[@]}; do
         idx_str=$(printf "%05d" ${idx})
         echo "x: $x, y: $y"
         
