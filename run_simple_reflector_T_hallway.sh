@@ -61,7 +61,7 @@ ${BLENDER_APP} -b ${BLENDER_DIR}/models/tee_hallway_color.blend --python ${SIGMA
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
 
 # Setting up the environment
-num_samples=1e6
+num_samples=10e6
 
 # Main loop to compute the coverage map
 # xs=($(seq -4.25 -0.25 -6.0))
