@@ -1,0 +1,48 @@
+base_config: hallway
+
+# Defaults
+mitsuba_filename: "hallway"
+scene_name: "simple_reflector_L_hallway"
+resolution: [1920, 1080]
+cm_vmin: -120
+cm_vmax: -60
+verbose: True
+video: False
+default_end: ""
+test: true
+
+# Scene defaults
+cam_position: [-7.5, -4.0, 50.0]
+cam_orientation: [0.0, 0.0, 0.0]
+cam_look_at: [-7.5, -4.0, 0.0]
+frequency: 28e9
+synthetic_array: True
+scene_end: ""
+
+# Device defaults
+tx_num_rows: 4
+tx_num_cols: 4
+tx_vertical_spacing: 0.5
+tx_horizontal_spacing: 0.5
+tx_pattern: "tr38901"
+tx_polarization: "V"
+tx_position: [1.0, 0.0, 1.5]
+tx_orientation: [0.0, 0.0, 0.0]
+rx_included: True
+rx_num_rows: 1
+rx_num_cols: 1
+rx_vertical_spacing: 0.5
+rx_horizontal_spacing: 0.5
+rx_pattern: "iso"
+rx_polarization: "V"
+rx_position: [-3.0, -4.2, 1.5]
+rx_orientation: [0.0, 0.0, 0.0]
+device_end: ""
+
+# Ray tracing defaults
+cm_max_depth: 15
+cm_cell_size: [0.2, 0.2]
+cm_num_samples: 10e6
+path_max_depth: 2
+path_num_samples: 3e6
+diffraction: True

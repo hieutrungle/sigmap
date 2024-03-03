@@ -1,8 +1,8 @@
-base_config: tee_hallway
+base_config: hallway
 
 # Defaults
 mitsuba_filename: "hallway"
-scene_name: "beamfocusing_tee_hallway"
+scene_name: "no_reflector_T_hallway"
 resolution: [1920, 1080]
 cm_vmin: -120
 cm_vmax: -60
@@ -35,7 +35,7 @@ rx_vertical_spacing: 0.5
 rx_horizontal_spacing: 0.5
 rx_pattern: "iso"
 rx_polarization: "V"
-rx_position: [-4.7, -11.3, 1.5]
+rx_position: [-3.0, -4.2, 1.5]
 rx_orientation: [0.0, 0.0, 0.0]
 device_end: ""
 

@@ -1,8 +1,8 @@
-base_config: simple_hallway
+base_config: hallway
 
 # Defaults
 mitsuba_filename: "hallway"
-scene_name: "beamfocusing_simple_hallway"
+scene_name: "simple_reflector_T_hallway"
 resolution: [1920, 1080]
 cm_vmin: -120
 cm_vmax: -60
