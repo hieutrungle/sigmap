@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# set -x  # Enable debugging
 set -o pipefail # Pipe fails when any command in the pipe fails
 set -u  # Treat unset variables as an error
 
@@ -37,8 +36,9 @@ echo Blender directory: $BLENDER_DIR
 echo Coverage map directory: $SIGMAP_DIR
 echo -e Assets directory: $ASSETS_DIR '\n'
 
-BASE_CONFIG_FILE=${SIGMAP_DIR}/config/base_tee_hallway.yaml
-WORK_CONFIG_FILE=${SIGMAP_DIR}/config/tee_hallway_tmp.yaml
+BASE_CONFIG_FILE=${SIGMAP_DIR}/config/simple_reflector_L_hallway.yaml
+filename=$(basename -- "$BASE_CONFIG_FILE")
+WORK_CONFIG_FILE=${SIGMAP_DIR}/config/tmp_${filename}
 
 # Find the blender executable
 for file in ${BLENDER_DIR}/*
@@ -54,7 +54,7 @@ if [ ! -f ${BLENDER_DIR}/addons/mitsuba*.zip ]; then
     wget -P ${BLENDER_DIR}/addons https://github.com/mitsuba-renderer/mitsuba-blender/releases/download/v0.3.0/mitsuba-blender.zip 
     # unzip mitsuba-blender.zip -d ${BLENDER_DIR}/addons
 fi
-${BLENDER_APP} -b ${BLENDER_DIR}/models/tee_hallway_color.blend --python ${SIGMAP_DIR}/sigmap/blender_script/install_mitsuba_addon.py
+${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SIGMAP_DIR}/sigmap/blender_script/install_mitsuba_addon.py
 
 # get scene_name from BASE_CONFIG_FILE
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
@@ -63,14 +63,12 @@ SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FI
 num_samples=10e6
 
 # Main loop to compute the coverage map
-# xs=($(seq -4.25 -0.25 -6.0))
-xs=($(seq -6.0 0.25 -4.25))
-ys=($(seq -5.0 -0.25 -13.0))
+xs=($(seq -3.0 0.25 -2.0))
+ys=($(seq -2.5 -0.25 -4.5))
 idx=0
-for y in ${ys[@]}; do
-    xs=( $(printf '%s\n' "${xs[@]}" | tac) )
-    # ys=( $(printf '%s\n' "${ys[@]}" | tac) )
-    for x in ${xs[@]}; do
+for x in ${xs[@]}; do
+    ys=( $(printf '%s\n' "${ys[@]}" | tac) )
+    for y in ${ys[@]}; do
         idx_str=$(printf "%05d" ${idx})
         echo "x: $x, y: $y"
         
@@ -83,7 +81,7 @@ for y in ${ys[@]}; do
         # Perform the export of the mitsuba scene using the blender script
         echo -e 'Exporting mitsuba scene...'
         ${BLENDER_APP} \
-            -b ${BLENDER_DIR}/models/tee_hallway_color.blend \
+            -b ${BLENDER_DIR}/models/simple_hallway_color.blend \
             --python ${SIGMAP_DIR}/sigmap/blender_script/hallway.py \
                 -- -cfg ${WORK_CONFIG_FILE} -o ${ASSETS_DIR}/blender \
                 --index ${idx_str}

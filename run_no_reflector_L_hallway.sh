@@ -36,8 +36,9 @@ echo Blender directory: $BLENDER_DIR
 echo Coverage map directory: $SIGMAP_DIR
 echo -e Assets directory: $ASSETS_DIR '\n'
 
-BASE_CONFIG_FILE=${SIGMAP_DIR}/config/base_simple_hallway.yaml
-WORK_CONFIG_FILE=${SIGMAP_DIR}/config/simple_hallway_tmp.yaml
+BASE_CONFIG_FILE=${SIGMAP_DIR}/config/no_reflector_L_hallway.yaml
+filename=$(basename -- "$BASE_CONFIG_FILE")
+WORK_CONFIG_FILE=${SIGMAP_DIR}/config/tmp_${filename}
 
 # Find the blender executable
 for file in ${BLENDER_DIR}/*
@@ -59,11 +60,11 @@ ${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SI
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${BASE_CONFIG_FILE}', 'r'))['scene_name'])")
 
 # Setting up the environment
-num_samples=4e6
+num_samples=10e6
 
 # Main loop to compute the coverage map
-xs=($(seq -3.0 5.5 -2.0))
-ys=($(seq -2.5 -5.0 -4.5))
+xs=($(seq -3.0 0.25 -2.0))
+ys=($(seq -2.5 -0.25 -4.5))
 idx=0
 for x in ${xs[@]}; do
     ys=( $(printf '%s\n' "${ys[@]}" | tac) )
