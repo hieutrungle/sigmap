@@ -100,7 +100,7 @@ def export_no_reflector_scene(args, config):
     )
 
 
-def export_flat_reflector_scene(args, config):
+def export_simple_reflector_scene(args, config):
     devices = []
     devices_names = []
     for k, v in bpy.data.collections.items():
@@ -170,12 +170,10 @@ def main():
 
     if "beamfocusing" in config.scene_name:
         export_beamfocusing_hallway(args, config)
-
-    # if config.scene_name == "beamfocusing_simple_hallway":
-    #     export_beamfocusing_simple_hallway(args, config)
-    # elif config.scene_name == "beamfocusing_tee_hallway":
-    #     export_beamfocusing_tee_hallway(args, config)
-
+    elif "simple_reflector" in config.scene_name:
+        export_simple_reflector_scene(args, config)
+    elif "no_reflector" in config.scene_name:
+        export_no_reflector_scene(args, config)
     else:
         raise ValueError(f"Unknown scene name: {config.scene_name}")
 
