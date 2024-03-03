@@ -64,7 +64,7 @@ num_samples=10e6
 
 # Main loop to compute the coverage map
 xs=($(seq -3.0 0.25 -2.0))
-ys=($(seq -2.5 -0.25 -4.5))
+ys=($(seq -2.5 -0.25 -14.5))
 idx=0
 for x in ${xs[@]}; do
     ys=( $(printf '%s\n' "${ys[@]}" | tac) )
