@@ -1,6 +1,8 @@
 from sigmap.utils import utils, timer, logger, map_prep
 import os
 import sionna.rt
+from typing import List
+import tensorflow as tf
 
 
 class SignalCoverageMap:
@@ -88,6 +90,56 @@ class SignalCoverageMap:
             show_devices=True,
         )
         scene.render_to_file(**render_config)
+
+    def render_to_file(
+        self,
+        coverage_map: sionna.rt.CoverageMap = None,
+        paths: sionna.rt.Paths = None,
+        filename: str = None,
+    ) -> None:
+        scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
+
+        if filename is None:
+            render_filename = utils.create_filename(
+                self.img_dir, f"{self.config.mitsuba_filename}_00000.png"
+            )
+        else:
+            render_filename = filename
+        render_config = dict(
+            camera=self.cam,
+            paths=paths,
+            filename=render_filename,
+            coverage_map=coverage_map,
+            cm_vmin=self.config.cm_vmin,
+            cm_vmax=self.config.cm_vmax,
+            resolution=self.config.resolution,
+            show_devices=True,
+        )
+        scene.render_to_file(**render_config)
+
+    def get_received_power_slow(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+        coverage_map_tensor = coverage_map.as_tensor()
+        coverage_map_centers = coverage_map.cell_centers
+        rx_position = self.config.rx_position
+        distances = tf.norm(coverage_map_centers - rx_position, axis=-1)
+        min_dist = tf.reduce_min(distances)
+        min_ind = tf.where(tf.equal(distances, min_dist))[0]
+
+        return coverage_map_tensor[0, min_ind[0], min_ind[1]]
+
+    def get_received_power(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+        coverage_map_tensor = coverage_map.as_tensor()
+        coverage_map_centers = coverage_map.cell_centers
+        rx_position = tf.convert_to_tensor(self.config.rx_position)
+
+        top_left_pos = coverage_map_centers[0, 0, 0:2] - (coverage_map.cell_size / 2)
+        x_distance_to_top_left = rx_position[0] - top_left_pos[0]
+        y_distance_to_top_left = rx_position[1] - top_left_pos[1]
+
+        ind_y = int(y_distance_to_top_left / coverage_map.cell_size[1])
+        ind_x = int(x_distance_to_top_left / coverage_map.cell_size[0])
+
+        return coverage_map_tensor[0, ind_y, ind_x]
 
     def get_viz_scene(self) -> sionna.rt.Scene:
         scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
