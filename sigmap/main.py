@@ -9,7 +9,8 @@ gpu_num = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-# import numpy as np
+import numpy as np
+
 # import tensorflow as tf
 # import sionna
 from sigmap.utils import logger, utils, timer, map_prep
@@ -64,19 +65,32 @@ def main():
 
     # Prepare folders
     sig_cmap = compute.signal_cmap.SignalCoverageMap(args, config)
-    sig_cmap.compute_render(
-        cmap_enabled=args.cmap_enabled, paths_enabled=args.paths_enabled
-    )
+    coverage_map = sig_cmap.compute_cmap() if args.cmap_enabled else None
+    paths = sig_cmap.compute_paths() if args.paths_enabled else None
+    sig_cmap.render_to_file(coverage_map, paths)
 
-    # Create video
-    if args.video_enabled:
-        logger.log(f"\nCreating video for {config.scene_name}")
-        with timer.Timer(
-            text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
-        ):
-            img_dir = utils.get_image_dir(config)
-            video_dir = utils.get_video_dir(config)
-            video_gen.create_video(img_dir, video_dir, config)
+    # Compute received power
+    received_power = sig_cmap.get_received_power(coverage_map)
+    results_dir = utils.get_results_dir(config)
+    results_file = os.path.join(results_dir, config.scene_name + "_received_power.csv")
+    rx_position_str = str(config.rx_position)
+    # remove [] from the string
+    rx_position_str = str(rx_position_str).replace("[", "").replace("]", "")
+    results_dict = {
+        str(rx_position_str): received_power.numpy(),
+    }
+    with open(results_file, "a") as f:
+        f.write(utils.dict_to_csv(results_dict))
+
+    # # Create video
+    # if args.video_enabled:
+    #     logger.log(f"\nCreating video for {config.scene_name}")
+    #     with timer.Timer(
+    #         text="Elapsed video creation time: {:0.4f} seconds\n", logger_fn=logger.log
+    #     ):
+    #         img_dir = utils.get_image_dir(config)
+    #         video_dir = utils.get_video_dir(config)
+    #         video_gen.create_video(img_dir, video_dir, config)
 
 
 def create_args() -> argparse.ArgumentParser:
