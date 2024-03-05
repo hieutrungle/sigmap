@@ -149,3 +149,10 @@ def get_video_dir(config: Dict[str, Union[str, float, bool]]) -> str:
     video_dir = os.path.join(assets_dir, "videos")
     mkdir_not_exists(video_dir)
     return video_dir
+
+
+def get_results_dir(config: Dict[str, Union[str, float, bool]]) -> str:
+    assets_dir = get_asset_dir()
+    results_dir = os.path.join(assets_dir, "results")
+    mkdir_not_exists(results_dir)
+    return results_dir
