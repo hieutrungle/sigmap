@@ -43,7 +43,7 @@ class MLPPolicy(nn.Module):
                 output_size=ac_dim,
                 n_layers=n_layers,
                 size=layer_size,
-            ).to(ptu.device)
+            ).to(ptu.DEVICE)
         else:
             if self.state_dependent_std:
                 assert fixed_std is None
@@ -52,21 +52,21 @@ class MLPPolicy(nn.Module):
                     output_size=2 * ac_dim,
                     n_layers=n_layers,
                     size=layer_size,
-                ).to(ptu.device)
+                ).to(ptu.DEVICE)
             else:
                 self.net = ptu.build_mlp(
                     input_size=ob_dim,
                     output_size=ac_dim,
                     n_layers=n_layers,
                     size=layer_size,
-                ).to(ptu.device)
+                ).to(ptu.DEVICE)
 
                 if self.fixed_std:
                     self.std = 0.1
                 else:
                     self.std = nn.Parameter(
                         torch.full(
-                            (ac_dim,), 0.0, dtype=torch.float32, device=ptu.device
+                            (ac_dim,), 0.0, dtype=torch.float32, device=ptu.DEVICE
                         )
                     )
 

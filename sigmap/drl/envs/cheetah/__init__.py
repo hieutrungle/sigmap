@@ -1,1 +1,1 @@
-from cs285.envs.cheetah.cheetah import HalfCheetahEnv
+from sigmap.drl.envs.cheetah.cheetah import HalfCheetahEnv

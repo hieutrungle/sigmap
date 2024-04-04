@@ -67,7 +67,7 @@ class Reacher7DOFEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         # finalize step
         env_info = {"ob": ob, "rewards": self.reward_dict, "score": score}
 
-        return ob, reward, done, env_info
+        return ob, reward, done, done, env_info
 
     def get_score(self, obs):
         hand_pos = obs[-6:-3]

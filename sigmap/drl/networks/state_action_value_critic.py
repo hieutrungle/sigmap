@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 
-import cs285.infrastructure.pytorch_util as ptu
+import sigmap.drl.infrastructure.pytorch_utils as ptu
+
 
 class StateActionCritic(nn.Module):
     def __init__(self, ob_dim, ac_dim, n_layers, size):
@@ -11,7 +12,7 @@ class StateActionCritic(nn.Module):
             output_size=1,
             n_layers=n_layers,
             size=size,
-        ).to(ptu.device)
-    
+        ).to(ptu.DEVICE)
+
     def forward(self, obs, acs):
         return self.net(torch.cat([obs, acs], dim=-1)).squeeze(-1)

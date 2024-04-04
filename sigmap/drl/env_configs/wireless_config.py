@@ -1,9 +1,7 @@
 from typing import Tuple, Optional
-
 import numpy as np
 import torch
 import torch.nn as nn
-
 from sigmap.drl.networks.mlp_policy import MLPPolicy
 from sigmap.drl.networks.state_action_value_critic import StateActionCritic
 import sigmap.drl.infrastructure.pytorch_utils as ptu
@@ -14,7 +12,7 @@ from gymnasium.wrappers.clip_action import ClipAction
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 
-def sac_config(
+def wireless_config(
     env_name: str,
     exp_name: Optional[str] = None,
     hidden_size: int = 128,
@@ -45,20 +43,28 @@ def sac_config(
     actor_fixed_std: Optional[float] = None,
     use_tanh: bool = True,
 ):
-    def make_critic(observation_shape: Tuple[int, ...], action_dim: int) -> nn.Module:
+    def make_critic(
+        observation_shape: Tuple[int, ...], action_shape: Tuple[int, ...]
+    ) -> nn.Module:
+        ob_dim = np.prod(observation_shape)
+        ac_dim = np.prod(action_shape)
         return StateActionCritic(
-            ob_dim=np.prod(observation_shape),
-            ac_dim=action_dim,
+            ob_dim=ob_dim,
+            ac_dim=ac_dim,
             n_layers=num_layers,
             size=hidden_size,
         )
 
-    def make_actor(observation_shape: Tuple[int, ...], action_dim: int) -> nn.Module:
-        assert len(observation_shape) == 1
+    def make_actor(
+        observation_shape: Tuple[int, ...], action_shape: Tuple[int, ...]
+    ) -> nn.Module:
+        assert len(observation_shape) == 3
+        ob_dim = np.prod(observation_shape)
+        ac_dim = np.prod(action_shape)
         if actor_fixed_std is not None:
             return MLPPolicy(
-                ac_dim=action_dim,
-                ob_dim=np.prod(observation_shape),
+                ac_dim=ac_dim,
+                ob_dim=ob_dim,
                 discrete=False,
                 n_layers=num_layers,
                 layer_size=hidden_size,
@@ -68,8 +74,8 @@ def sac_config(
             )
         else:
             return MLPPolicy(
-                ac_dim=action_dim,
-                ob_dim=np.prod(observation_shape),
+                ac_dim=ac_dim,
+                ob_dim=ob_dim,
                 discrete=False,
                 n_layers=num_layers,
                 layer_size=hidden_size,
@@ -88,14 +94,25 @@ def sac_config(
     ) -> torch.optim.lr_scheduler._LRScheduler:
         return torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
 
+    # def make_env(render: bool = False):
+    #     return RecordEpisodeStatistics(
+    #         ClipAction(
+    #             RescaleAction(
+    #                 gym.make(env_name, render_mode="rgb_array" if render else None),
+    #                 -1,
+    #                 1,
+    #             )
+    #         )
+    #     )
+
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
-            ClipAction(
-                RescaleAction(
-                    gym.make(env_name, render_mode="rgb_array" if render else None),
-                    -1,
-                    1,
-                )
+            gym.make(
+                env_name,
+                num_devices=1,
+                num_tiles_per_device=70,
+                controlled_elements=2,
+                render_mode="rgb_array" if render else None,
             )
         )
 

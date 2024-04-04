@@ -2,14 +2,15 @@ import numpy as np
 
 
 class ReplayBuffer:
-    def __init__(self, buffer_size: int):
+    def __init__(self, buffer_size: int = 1000000):
         self.max_size = buffer_size
         self.size_counter = 0
         self.observations = None
         self.actions = None
         self.rewards = None
         self.next_observations = None
-        self.dones = None
+        self.terminateds = None
+        self.truncateds = None
 
     def sample(self, batch_size: int):
         rand_indices = (
@@ -20,7 +21,8 @@ class ReplayBuffer:
             "actions": self.actions[rand_indices],
             "rewards": self.rewards[rand_indices],
             "next_observations": self.next_observations[rand_indices],
-            "dones": self.dones[rand_indices],
+            "terminateds": self.terminateds[rand_indices],
+            "truncateds": self.truncateds[rand_indices],
         }
 
     def __len__(self):
@@ -33,7 +35,8 @@ class ReplayBuffer:
         action: np.ndarray,
         reward: np.ndarray,
         next_observation: np.ndarray,
-        done: np.ndarray,
+        terminated: np.ndarray,
+        truncated: np.ndarray,
     ):
         """
         Insert a single transition into the replay buffer.
@@ -44,13 +47,16 @@ class ReplayBuffer:
                 action=action,
                 reward=reward,
                 next_observation=next_observation,
-                done=done,
+                terminated=terminated,
+                truncated=truncated,
             )
         """
         if isinstance(reward, (float, int)):
             reward = np.array(reward)
-        if isinstance(done, bool):
-            done = np.array(done)
+        if isinstance(terminated, bool):
+            terminated = np.array(terminated)
+        if isinstance(truncated, bool):
+            truncated = np.array(truncated)
         if isinstance(action, int):
             action = np.array(action, dtype=np.int64)
 
@@ -63,22 +69,29 @@ class ReplayBuffer:
             self.next_observations = np.empty(
                 (self.max_size, *next_observation.shape), dtype=next_observation.dtype
             )
-            self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
+            self.terminateds = np.empty(
+                (self.max_size, *terminated.shape), dtype=terminated.dtype
+            )
+            self.truncateds = np.empty(
+                (self.max_size, *truncated.shape), dtype=truncated.dtype
+            )
 
         assert observation.shape == self.observations.shape[1:]
         assert action.shape == self.actions.shape[1:]
         assert reward.shape == ()
         assert next_observation.shape == self.next_observations.shape[1:]
-        assert done.shape == ()
+        assert terminated.shape == ()
+        assert truncated.shape == ()
 
         self.observations[self.size_counter % self.max_size] = observation
         self.actions[self.size_counter % self.max_size] = action
         self.rewards[self.size_counter % self.max_size] = reward
         self.next_observations[self.size_counter % self.max_size] = next_observation
-        self.dones[self.size_counter % self.max_size] = done
+        self.terminateds[self.size_counter % self.max_size] = terminated
+        self.truncateds[self.size_counter % self.max_size] = truncated
 
         self.size_counter += 1
-        self.size_counter = self.size_counter % self.max_size
+        self.size_counter = self.size_counter
 
     def batched_insert(
         self,
@@ -87,7 +100,8 @@ class ReplayBuffer:
         actions: np.ndarray,
         rewards: np.ndarray,
         next_observations: np.ndarray,
-        dones: np.ndarray,
+        terminated: np.ndarray,
+        truncated: np.ndarray,
     ):
         """
         Insert a batch of transitions into the replay buffer.
@@ -106,13 +120,19 @@ class ReplayBuffer:
                 (self.max_size, *next_observations.shape[1:]),
                 dtype=next_observations.dtype,
             )
-            self.dones = np.empty((self.max_size, *dones.shape[1:]), dtype=dones.dtype)
+            self.terminateds = np.empty(
+                (self.max_size, *terminated.shape[1:]), dtype=terminated.dtype
+            )
+            self.truncateds = np.empty(
+                (self.max_size, *truncated.shape[1:]), dtype=truncated.dtype
+            )
 
         assert observations.shape[1:] == self.observations.shape[1:]
         assert actions.shape[1:] == self.actions.shape[1:]
         assert rewards.shape[1:] == self.rewards.shape[1:]
         assert next_observations.shape[1:] == self.next_observations.shape[1:]
-        assert dones.shape[1:] == self.dones.shape[1:]
+        assert terminated.shape[1:] == self.terminateds.shape[1:]
+        assert truncated.shape[1:] == self.truncateds.shape[1:]
 
         indices = (
             np.arange(self.size_counter, self.size_counter + observations.shape[0])
@@ -122,7 +142,212 @@ class ReplayBuffer:
         self.actions[indices] = actions
         self.rewards[indices] = rewards
         self.next_observations[indices] = next_observations
-        self.dones[indices] = dones
+        self.terminateds[indices] = terminated
 
         self.size_counter += observations.shape[0]
-        self.size_counter = self.size_counter % self.max_size
+        self.size_counter = self.size_counter
+
+
+class MemoryEfficientReplayBuffer:
+    """
+    A memory-efficient version of the replay buffer for when observations are stacked.
+    """
+
+    def __init__(self, frame_history_len: int, capacity=1000000):
+        self.max_size = capacity
+
+        # Technically we need max_size*2 to support both obs and next_obs.
+        # Otherwise we'll end up overwriting old observations' frames, but the
+        # corresponding next_observation_framebuffer_idcs will still point to the old frames.
+        # (It's okay though because the unused data will be paged out)
+        self.max_framebuffer_size = 2 * capacity
+
+        self.frame_history_len = frame_history_len
+        self.size = 0
+        self.actions = None
+        self.rewards = None
+        self.terminateds = None
+        self.truncateds = None
+
+        self.observation_framebuffer_idcs = None
+        self.next_observation_framebuffer_idcs = None
+        self.framebuffer = None
+        self.observation_shape = None
+
+        self.current_trajectory_begin = None
+        self.current_trajectory_framebuffer_begin = None
+        self.framebuffer_idx = None
+
+        self.recent_observation_framebuffer_idcs = None
+
+    def sample(self, batch_size):
+        rand_indices = (
+            np.random.randint(0, self.size, size=(batch_size,)) % self.max_size
+        )
+
+        observation_framebuffer_idcs = (
+            self.observation_framebuffer_idcs[rand_indices] % self.max_framebuffer_size
+        )
+        next_observation_framebuffer_idcs = (
+            self.next_observation_framebuffer_idcs[rand_indices]
+            % self.max_framebuffer_size
+        )
+
+        return {
+            "observations": self.framebuffer[observation_framebuffer_idcs],
+            "actions": self.actions[rand_indices],
+            "rewards": self.rewards[rand_indices],
+            "next_observations": self.framebuffer[next_observation_framebuffer_idcs],
+            "terminateds": self.terminateds[rand_indices],
+            "truncateds": self.truncateds[rand_indices],
+        }
+
+    def __len__(self):
+        return self.size
+
+    def _insert_frame(self, frame: np.ndarray) -> int:
+        """
+        Insert a single frame into the replay buffer.
+
+        Returns the index of the frame in the replay buffer.
+        """
+        assert frame.ndim == 2, "Single-frame observation should have dimensions (H, W)"
+        assert frame.dtype == np.uint8, "Observation should be uint8 (0-255)"
+
+        self.framebuffer[self.framebuffer_idx] = frame
+        frame_idx = self.framebuffer_idx
+        self.framebuffer_idx = self.framebuffer_idx + 1
+
+        return frame_idx
+
+    def _compute_frame_history_idcs(
+        self, latest_framebuffer_idx: int, trajectory_begin_framebuffer_idx: int
+    ) -> np.ndarray:
+        """
+        Get the indices of the frames in the replay buffer corresponding to the
+        frame history for the given latest frame index and trajectory begin index.
+
+        Indices are into the observation buffer, not the regular buffers.
+        """
+        return np.maximum(
+            np.arange(-self.frame_history_len + 1, 1) + latest_framebuffer_idx,
+            trajectory_begin_framebuffer_idx,
+        )
+
+    def on_reset(
+        self,
+        /,
+        observation: np.ndarray,
+    ):
+        """
+        Call this with the first observation of a new episode.
+        """
+        assert (
+            observation.ndim == 2
+        ), "Single-frame observation should have dimensions (H, W)"
+        assert observation.dtype == np.uint8, "Observation should be uint8 (0-255)"
+
+        if self.observation_shape is None:
+            self.observation_shape = observation.shape
+        else:
+            assert self.observation_shape == observation.shape
+
+        if self.observation_framebuffer_idcs is None:
+            self.observation_framebuffer_idcs = np.empty(
+                (self.max_size, self.frame_history_len), dtype=np.int64
+            )
+            self.next_observation_framebuffer_idcs = np.empty(
+                (self.max_size, self.frame_history_len), dtype=np.int64
+            )
+            self.framebuffer = np.empty(
+                (self.max_framebuffer_size, *observation.shape), dtype=observation.dtype
+            )
+            self.framebuffer_idx = 0
+            self.current_trajectory_begin = 0
+            self.current_trajectory_framebuffer_begin = 0
+
+        self.current_trajectory_begin = self.size
+
+        # Insert the observation.
+        self.current_trajectory_framebuffer_begin = self._insert_frame(observation)
+        # Compute, but don't store until we have a next observation.
+        self.recent_observation_framebuffer_idcs = self._compute_frame_history_idcs(
+            self.current_trajectory_framebuffer_begin,
+            self.current_trajectory_framebuffer_begin,
+        )
+
+    def insert(
+        self,
+        /,
+        action: np.ndarray,
+        reward: np.ndarray,
+        next_observation: np.ndarray,
+        terminated: np.ndarray,
+        truncated: np.ndarray,
+    ):
+        """
+        Insert a single transition into the replay buffer.
+
+        Use like:
+            replay_buffer.insert(
+                observation=observation,
+                action=action,
+                reward=reward,
+                next_observation=next_observation,
+                terminated=terminated,
+                truncated=truncated,
+            )
+        """
+        if isinstance(reward, (float, int)):
+            reward = np.array(reward)
+        if isinstance(terminated, bool):
+            terminated = np.array(terminated)
+        if isinstance(truncated, bool):
+            truncated = np.array(truncated)
+        if isinstance(action, int):
+            action = np.array(action, dtype=np.int64)
+
+        assert (
+            next_observation.ndim == 2
+        ), "Single-frame observation should have dimensions (H, W)"
+        assert next_observation.dtype == np.uint8, "Observation should be uint8 (0-255)"
+
+        if self.actions is None:
+            self.actions = np.empty((self.max_size, *action.shape), dtype=action.dtype)
+            self.rewards = np.empty((self.max_size, *reward.shape), dtype=reward.dtype)
+            self.terminateds = np.empty(
+                (self.max_size, *terminated.shape), dtype=terminated.dtype
+            )
+            self.truncateds = np.empty(
+                (self.max_size, *truncated.shape), dtype=truncated.dtype
+            )
+
+        assert action.shape == self.actions.shape[1:]
+        assert reward.shape == ()
+        assert next_observation.shape == self.observation_shape
+        assert terminated.shape == ()
+        assert truncated.shape == ()
+
+        self.observation_framebuffer_idcs[self.size % self.max_size] = (
+            self.recent_observation_framebuffer_idcs
+        )
+        self.actions[self.size % self.max_size] = action
+        self.rewards[self.size % self.max_size] = reward
+        self.terminateds[self.size % self.max_size] = terminated
+        self.truncateds[self.size % self.max_size] = truncated
+
+        next_frame_idx = self._insert_frame(next_observation)
+
+        # Compute indices for the next observation.
+        next_framebuffer_idcs = self._compute_frame_history_idcs(
+            next_frame_idx, self.current_trajectory_framebuffer_begin
+        )
+        self.next_observation_framebuffer_idcs[self.size % self.max_size] = (
+            next_framebuffer_idcs
+        )
+
+        self.size += 1
+
+        # Set up the observation for the next step.
+        # This won't be sampled yet, and it will be overwritten if we start a new episode.
+        self.recent_observation_framebuffer_idcs = next_framebuffer_idcs

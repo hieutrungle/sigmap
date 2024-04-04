@@ -6,13 +6,7 @@ from gymnasium.spaces import Box
 
 class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     metadata = {
-        "render_modes": [
-            "human",
-            "rgb_array",
-            "depth_array",
-            "single_rgb_array",
-            "single_depth_array",
-        ],
+        "render_modes": ["human", "rgb_array", "depth_array"],
         "render_fps": 100,
     }
 
@@ -38,6 +32,7 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         Return:
             r_total: reward of this (o,a) pair, dimension is (batchsize,1) or (1,)
+            truncated: Whether the truncation condition outside the scope of the MDP is satisfied, dimension is (batchsize,1) or (1,)
             done: True if env reaches terminal state, dimension is (batchsize,1) or (1,)
         """
 
@@ -89,9 +84,11 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         # return
         dones = zeros.copy()
+        truncated = zeros.copy()
+        truncated = np.asarray(truncated, dtype=bool)
         if not batch_mode:
-            return self.reward_dict["r_total"][0], dones[0]
-        return self.reward_dict["r_total"], dones
+            return self.reward_dict["r_total"][0], dones[0], truncated[0]
+        return self.reward_dict["r_total"], dones, truncated
 
     def get_score(self, obs):
         xposafter = obs[0]
@@ -105,7 +102,7 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         # obs/reward/done/score
         ob = self._get_obs()
-        rew, done = self.get_reward(ob, action)
+        rew, done, truncated = self.get_reward(ob, action)
         score = self.get_score(ob)
 
         # return
@@ -114,7 +111,7 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             "rewards": self.reward_dict,
             "score": score,
         }
-        return ob, rew, done, env_info
+        return ob, rew, done, truncated, env_info
 
     def _get_obs(self):
         self.obs_dict = {}
@@ -137,7 +134,7 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.reset_pose = self.init_qpos + self.np_random.uniform(
             low=-0.1, high=0.1, size=self.model.nq
         )
-        self.reset_vel = self.init_qvel + self.np_random.randn(self.model.nv) * 0.1
+        self.reset_vel = self.init_qvel + self.np_random.random(self.model.nv) * 0.1
 
         # reset the env to that pose/vel
         return self.do_reset(self.reset_pose.copy(), self.reset_vel.copy())

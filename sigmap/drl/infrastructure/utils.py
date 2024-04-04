@@ -23,7 +23,7 @@ def sample_trajectory(
     env: gym.Env, policy: MLPPolicy, max_length: int, render: bool = False
 ) -> Dict[str, np.ndarray]:
     """Sample a rollout in the environment from a policy."""
-    ob = env.reset()
+    ob, info = env.reset()
     obs, acs, rewards, next_obs, dones, image_obs = [], [], [], [], [], []
     steps = 0
 
