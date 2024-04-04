@@ -19,3 +19,4 @@ scripts/
 sigmap.egg-info/
 *test*
 job*
+data/
