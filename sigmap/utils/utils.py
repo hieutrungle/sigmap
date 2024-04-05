@@ -5,6 +5,7 @@ import argparse
 from sigmap.utils import logger
 import glob
 from typing import Dict, List, Union, Tuple
+import yaml
 
 
 def mkdir_not_exists(folder_dir: str) -> None:
@@ -164,3 +165,15 @@ def dict_to_csv(d: Dict[str, Union[str, float, bool]]) -> str:
     for k, v in d.items():
         csv += f"{k},{v}\n"
     return csv
+
+
+def load_yaml_file(file_path: str) -> dict:
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def write_yaml_file(file_path: str, data: dict) -> None:
+    tmp_file = file_path.split(".")[0] + "_tmp.yaml"
+    with open(tmp_file, "w") as f:
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+    os.rename(tmp_file, file_path)

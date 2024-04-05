@@ -1,4 +1,3 @@
-import yaml
 import os
 from typing import Dict, List, Union, Tuple
 import argparse
@@ -8,6 +7,8 @@ import time
 
 import sigmap.drl.env_configs
 from sigmap.drl.infrastructure.logger import TensorboardLogger
+import argparse
+from sigmap.utils import utils
 
 
 class Config:
@@ -21,14 +22,9 @@ class Config:
         return str(self.__dict__)
 
 
-def load_yaml_file(file_path: str) -> dict:
-    with open(file_path, "r") as f:
-        return yaml.safe_load(f)
-
-
 def make_sionna_config(config_file: str) -> Config:
     config = Config()
-    config_kwargs = load_yaml_file(config_file)
+    config_kwargs = utils.load_yaml_file(config_file)
     for k, v in config_kwargs.items():
         if isinstance(v, str):
             if v.lower() == "true":
@@ -44,14 +40,14 @@ def make_sionna_config(config_file: str) -> Config:
     return config
 
 
-def make_drl_config(config_file: str) -> dict:
+def make_drl_config(config_file: str, args: argparse.Namespace) -> Config:
     config = Config()
-    config_kwargs = load_yaml_file(config_file)
+    config_kwargs = utils.load_yaml_file(config_file)
     base_config_name = config_kwargs.pop("base_config")
+    config_kwargs.update({"args": args})
     config.__dict__.update(
         sigmap.drl.env_configs.configs[base_config_name](**config_kwargs)
     )
-    # return sigmap.drl.env_configs.configs[base_config_name](**config_kwargs)
     return config
 
 

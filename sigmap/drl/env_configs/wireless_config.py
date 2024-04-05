@@ -9,10 +9,14 @@ import sigmap.drl.infrastructure.pytorch_utils as ptu
 import gymnasium as gym
 from gymnasium.wrappers.rescale_action import RescaleAction
 from gymnasium.wrappers.clip_action import ClipAction
+from gymnasium.wrappers import TimeLimit
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
+
+import argparse
 
 
 def wireless_config(
+    args: argparse.Namespace,
     env_name: str,
     exp_name: Optional[str] = None,
     hidden_size: int = 128,
@@ -109,9 +113,10 @@ def wireless_config(
         return RecordEpisodeStatistics(
             gym.make(
                 env_name,
-                num_devices=1,
-                num_tiles_per_device=70,
-                controlled_elements=2,
+                sionna_config_file=args.sionna_config_file,
+                num_devices=args.num_devices,
+                num_tiles_per_device=args.num_tiles_per_device,
+                controlled_elements=args.controlled_elements,
                 render_mode="rgb_array" if render else None,
             )
         )
