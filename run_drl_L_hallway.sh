@@ -77,4 +77,5 @@ export TMP_DIR
 ##############################
 # DRL run
 ##############################
-python sigmap/tmp_autotune.py -dcfg ./config/drl_beamfocusing.yaml -scfg ${CONFIG_FILE} -v
+DEVICE_CONFIG="--num_devices 1 --num_tiles_per_device 70 --controlled_elements 2"
+python sigmap/tmp_autotune.py -dcfg ./config/drl_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
