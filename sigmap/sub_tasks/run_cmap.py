@@ -8,6 +8,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 from sigmap.utils import utils, logger, scripting_utils
 from sigmap import compute
 import tensorflow as tf
+import json
 
 
 def main():
@@ -34,17 +35,17 @@ def main():
     sig_cmap.render_to_file(coverage_map, paths)
 
     # Compute received power
-    received_power = sig_cmap.get_received_power(coverage_map)
-    results_dir = utils.get_results_dir(config)
-    results_file = os.path.join(results_dir, config.scene_name + "_received_power.csv")
-    rx_position_str = str(config.rx_position)
-    # remove [] from the string
-    rx_position_str = str(rx_position_str).replace("[", "").replace("]", "")
+    path_gain = sig_cmap.get_path_gain(coverage_map)
+
+    tmp_dir = utils.get_tmp_dir()
+    results_file = os.path.join(tmp_dir, "path_gain.txt")
     results_dict = {
-        str(rx_position_str): received_power.numpy(),
+        "tx_position": config.tx_position,
+        "rx_position": config.rx_position,
+        "path_gain": path_gain.numpy(),
     }
-    with open(results_file, "a") as f:
-        f.write(utils.dict_to_csv(results_dict))
+    with open(results_file, "w") as f:
+        json.dump(results_dict, f, cls=utils.NpEncoder)
 
 
 def create_args() -> argparse.ArgumentParser:
