@@ -19,6 +19,8 @@ class SignalCoverageMap:
         # Camera
         self._cam = map_prep.prepare_camera(self.config)
 
+        self.verbose = args.verbose
+
     @property
     def cam(self):
         return self._cam
@@ -28,7 +30,8 @@ class SignalCoverageMap:
     )
     def compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
         # Compute coverage maps with ceiling on
-        logger.log(f"Computing coverage map for {self._compute_scene_path}")
+        if self.verbose:
+            logger.log(f"Computing coverage map for {self._compute_scene_path}")
         scene = map_prep.prepare_scene(self.config, self._compute_scene_path, self.cam)
 
         cm_kwargs = dict(
@@ -46,7 +49,8 @@ class SignalCoverageMap:
     @timer.Timer(text="Elapsed paths time: {:0.4f} seconds\n", logger_fn=logger.log)
     def compute_paths(self, **kwargs) -> sionna.rt.Paths:
         # Compute coverage maps with ceiling on
-        logger.log(f"Computing paths for {self._compute_scene_path}")
+        if self.verbose:
+            logger.log(f"Computing paths for {self._compute_scene_path}")
         scene = map_prep.prepare_scene(self.config, self._compute_scene_path, self.cam)
 
         paths_kwargs = dict(
