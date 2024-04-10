@@ -121,7 +121,7 @@ class SignalCoverageMap:
         )
         scene.render_to_file(**render_config)
 
-    def get_received_power_slow(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+    def get_path_gain_slow(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
         coverage_map_tensor = coverage_map.as_tensor()
         coverage_map_centers = coverage_map.cell_centers
         rx_position = self.config.rx_position
@@ -131,7 +131,7 @@ class SignalCoverageMap:
 
         return coverage_map_tensor[0, min_ind[0], min_ind[1]]
 
-    def get_received_power(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+    def get_path_gain(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
         coverage_map_tensor = coverage_map.as_tensor()
         coverage_map_centers = coverage_map.cell_centers
         rx_position = tf.convert_to_tensor(self.config.rx_position)
