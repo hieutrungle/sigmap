@@ -115,7 +115,19 @@ class DataBatch:
     def __repr__(self):
         return str(self.batch)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Union[dict, np.ndarray]:
+        """
+        Get the value of the key in the batch.
+        Permissible keys are "next_observation", "action", "reward", "observation", and "done".
+        """
+        if key not in [
+            "next_observation",
+            "action",
+            "reward",
+            "observation",
+            "done",
+        ]:
+            raise ValueError("Key not found")
         return self.batch[key]
 
     def __setitem__(self, key, value):
@@ -185,7 +197,7 @@ class DataBatches:
     def __len__(self):
         return len(self.batches)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> DataBatch:
         return self.batches[idx]
 
     def __setitem__(self, idx, value):
@@ -211,16 +223,20 @@ class WirelessReplayBuffer(DataBatches):
         super().__init__()
         self.max_size = buffer_size
         self.size_counter = 0
-        self.batches = []
+        self.batches: list[DataBatch] = []
         self.saved_dir = saved_dir
         self.name = name
         self.prefix_idx = prefix_idx
 
-    def sample(self, batch_size: int):
+    def sample(self, batch_size: int) -> list[DataBatch]:
+
         rand_indices = (
             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
         )
-        return self.batches[rand_indices]
+        batches = []
+        for i in rand_indices:
+            batches.append(self.batches[i])
+        return batches
 
     def __len__(self):
         return self.size_counter
