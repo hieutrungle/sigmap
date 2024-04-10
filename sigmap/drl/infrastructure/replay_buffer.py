@@ -234,8 +234,8 @@ class WirelessReplayBuffer(DataBatches):
             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
         )
         batches = []
-        for i in rand_indices:
-            batches.append(self.batches[i])
+        for rand_idx in rand_indices:
+            batches.append(self.batches[rand_idx])
         return batches
 
     def __len__(self):
