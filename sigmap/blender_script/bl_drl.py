@@ -3,6 +3,7 @@ from mathutils import Vector
 import math
 import os
 import os, sys, inspect
+import pickle
 
 # realpath() will make your script run, even if you symlink it :)
 cmd_folder = os.path.realpath(
@@ -15,7 +16,7 @@ import bl_utils, bl_parser
 
 
 def export_drl_hallway(args, config):
-
+    # TODO: get device states from replay buffer
     devices = []
     devices_names = []
     for k, v in bpy.data.collections.items():
@@ -23,28 +24,23 @@ def export_drl_hallway(args, config):
             devices_names.append(k)
             devices.append(v.objects)
 
-    for tile_tuple in zip(*devices):
-        global_bbox_centers = []
+    # Same tmp_file as in wireless.py -> self._cal_reward()
+    tmp_dir = os.getenv("TMP_DIR")
+    tmp_file = os.path.join(tmp_dir, "device_states.pkl")
+
+    with open(tmp_file, "rb") as f:
+        device_states = pickle.load(f)
+
+    tile_tuples = zip(*devices)
+    for j, tile_tuple in enumerate(tile_tuples):
         for i, tile in enumerate(tile_tuple):
-            if i == 0:
-                global_bbox_centers.append(config.tx_position)
-            global_bbox_centers.append(bl_utils.get_center_bbox(tile))
-            if i == len(tile_tuple) - 1:
-                global_bbox_centers.append(config.rx_position)
 
-        for i in range(len(tile_tuple)):
-            r, theta, phi = bl_utils.compute_rot_angle_3pts(
-                global_bbox_centers[i],
-                global_bbox_centers[i + 1],
-                global_bbox_centers[i + 2],
-            )
-            tile_tuple[i].rotation_euler = [0, theta, phi]
-            tile_tuple[i].scale = [0.1, 0.1, 0.01]
+            tile.rotation_euler = [0, device_states[i][j][0], device_states[i][j][1]]
+            tile.scale = [0.1, 0.1, 0.01]
 
-    # Saving to mitsuba format for Sionna
-    print(
-        f"\nmitsuba saving with rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
-    )
+    # tmp_file = os.path.join(tmp_dir, "tmp.blend")
+    # print(f"tmp_file: {tmp_file}")
+    # bpy.ops.wm.save_mainfile(filepath=tmp_file)
 
     # Save files without ceiling
     folder_dir = os.path.join(
@@ -69,63 +65,6 @@ def export_drl_hallway(args, config):
         config.mitsuba_filename,
         [*devices_names, "Wall", "Floor", "Ceiling"],
     )
-
-
-# def export_drl_hallway(args, config):
-
-#     devices = []
-#     devices_names = []
-#     for k, v in bpy.data.collections.items():
-#         if "Reflector" in k:
-#             devices_names.append(k)
-#             devices.append(v.objects)
-
-#     for tile_tuple in zip(*devices):
-#         global_bbox_centers = []
-#         for i, tile in enumerate(tile_tuple):
-#             if i == 0:
-#                 global_bbox_centers.append(config.tx_position)
-#             global_bbox_centers.append(bl_utils.get_center_bbox(tile))
-#             if i == len(tile_tuple) - 1:
-#                 global_bbox_centers.append(config.rx_position)
-
-#         for i in range(len(tile_tuple)):
-#             r, theta, phi = bl_utils.compute_rot_angle_3pts(
-#                 global_bbox_centers[i],
-#                 global_bbox_centers[i + 1],
-#                 global_bbox_centers[i + 2],
-#             )
-#             tile_tuple[i].rotation_euler = [0, theta, phi]
-#             tile_tuple[i].scale = [0.1, 0.1, 0.01]
-
-#     # Saving to mitsuba format for Sionna
-#     print(
-#         f"\nmitsuba saving with rx_pos: {config.rx_position} and tx_pos: {config.tx_position}"
-#     )
-
-#     # Save files without ceiling
-#     folder_dir = os.path.join(
-#         args.output_dir,
-#         f"{config.scene_name}",
-#         f"idx",
-#     )
-#     bl_utils.mkdir_with_replacement(folder_dir)
-#     bl_utils.save_mitsuba_xml(
-#         folder_dir, config.mitsuba_filename, [*devices_names, "Wall", "Floor"]
-#     )
-
-#     # Save files with ceiling
-#     folder_dir = os.path.join(
-#         args.output_dir,
-#         f"{config.scene_name}",
-#         f"ceiling_idx",
-#     )
-#     bl_utils.mkdir_with_replacement(folder_dir)
-#     bl_utils.save_mitsuba_xml(
-#         folder_dir,
-#         config.mitsuba_filename,
-#         [*devices_names, "Wall", "Floor", "Ceiling"],
-#     )
 
 
 def main():
