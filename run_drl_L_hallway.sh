@@ -57,11 +57,22 @@ ${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SI
 # get scene_name from CONFIG_FILE
 SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${CONFIG_FILE}', 'r'))['scene_name'])")
 
+# Create a temporary directory
+TMP_DIR=${SIGMAP_DIR}/tmp
+
 export BLENDER_APP
 export BLENDER_DIR
 export SIGMAP_DIR
 export ASSETS_DIR
 export CONFIG_FILE
+export TMP_DIR
+
+# echo "Blender app: $BLENDER_APP"
+# echo "Blender directory: $BLENDER_DIR"
+# echo "SIGMAP directory: $SIGMAP_DIR"
+# echo "Assets directory: $ASSETS_DIR"
+# echo "Config file: $CONFIG_FILE"
+# echo "Temp directory: $TMP_DIR"
 
 ##############################
 # DRL run
