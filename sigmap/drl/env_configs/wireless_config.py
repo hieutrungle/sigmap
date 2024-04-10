@@ -98,17 +98,6 @@ def wireless_config(
     ) -> torch.optim.lr_scheduler._LRScheduler:
         return torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
 
-    # def make_env(render: bool = False):
-    #     return RecordEpisodeStatistics(
-    #         ClipAction(
-    #             RescaleAction(
-    #                 gym.make(env_name, render_mode="rgb_array" if render else None),
-    #                 -1,
-    #                 1,
-    #             )
-    #         )
-    #     )
-
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
             gym.make(
