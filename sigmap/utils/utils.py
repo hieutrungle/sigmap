@@ -191,3 +191,27 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+def get_tmp_dir():
+    tmp_dir = os.getenv("TMP_DIR")
+    if tmp_dir is None:
+        raise Exception("TMP_DIR environment variable is not set.")
+    mkdir_not_exists(tmp_dir)
+    return tmp_dir
+
+
+def get_assets_dir():
+    assets_dir = os.getenv("ASSETS_DIR")
+    if assets_dir is None:
+        raise Exception("ASSETS_DIR environment variable is not set.")
+    mkdir_not_exists(assets_dir)
+    return assets_dir
+
+
+def get_os_dir(name):
+    os_dir = os.getenv(name)
+    if os_dir is None:
+        raise Exception(f"{name} environment variable is not set.")
+    mkdir_not_exists(os_dir)
+    return os_dir
