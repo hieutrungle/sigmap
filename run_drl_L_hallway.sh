@@ -67,15 +67,8 @@ export ASSETS_DIR
 export CONFIG_FILE
 export TMP_DIR
 
-# echo "Blender app: $BLENDER_APP"
-# echo "Blender directory: $BLENDER_DIR"
-# echo "SIGMAP directory: $SIGMAP_DIR"
-# echo "Assets directory: $ASSETS_DIR"
-# echo "Config file: $CONFIG_FILE"
-# echo "Temp directory: $TMP_DIR"
-
 ##############################
 # DRL run
 ##############################
 DEVICE_CONFIG="--num_devices 1 --num_tiles_per_device 70 --controlled_elements 2"
-python sigmap/tmp_autotune.py -dcfg ./config/drl_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
+python sigmap/drl_wireless_main.py -dcfg ./config/drl_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
