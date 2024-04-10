@@ -6,6 +6,8 @@ from sigmap.utils import logger
 import glob
 from typing import Dict, List, Union, Tuple
 import yaml
+import json
+import numpy as np
 
 
 def mkdir_not_exists(folder_dir: str) -> None:
@@ -177,3 +179,15 @@ def write_yaml_file(file_path: str, data: dict) -> None:
     with open(tmp_file, "w") as f:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False)
     os.rename(tmp_file, file_path)
+
+
+class NpEncoder(json.JSONEncoder):
+    # json format for saving numpy array
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
