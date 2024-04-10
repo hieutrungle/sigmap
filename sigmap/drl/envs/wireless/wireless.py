@@ -12,7 +12,7 @@ from sigmap.utils import utils
 class WirelessEnv(Env):
     metadata = {
         "render_modes": ["human", "rgb_array", "depth_array"],
-        "render_fps": 100,
+        "render_fps": 10,
     }
 
     def __init__(
