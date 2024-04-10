@@ -1,13 +1,12 @@
 import os
 import re
+import subprocess
+import pickle
+import json
 
 import numpy as np
-from gymnasium.envs.mujoco import mujoco_env
-from gymnasium.spaces import Box
 from gymnasium import Env, spaces
-from utils import utils
-from gymnasium.wrappers import TimeLimit
-import subprocess
+from sigmap.utils import utils
 
 
 class WirelessEnv(Env):
@@ -26,22 +25,34 @@ class WirelessEnv(Env):
     ):
         super(WirelessEnv, self).__init__()
 
-        self.sionna_config_file = sionna_config_file
-        print(f"Loading Sionna config from {self.sionna_config_file}")
-
         self.num_devices = num_devices
         self.num_tiles_per_device = num_tiles_per_device
         self.controlled_elements = controlled_elements
 
-        self.observation_shape = (
+        self.sionna_config_file = sionna_config_file
+        config_kwargs = utils.load_yaml_file(sionna_config_file)
+        self._default_tx_position = config_kwargs["tx_position"]
+        self._default_rx_position = config_kwargs["rx_position"]
+
+        # Observation space
+        self.device_states_shape = (
             self.num_devices,
             self.num_tiles_per_device,
             self.controlled_elements,
         )
 
         # Rotation is in radians, [0, 2pi]
-        self.observation_space = spaces.Box(
-            low=0, high=2 * np.pi, shape=self.observation_shape, dtype=np.float32
+        device_states_space = spaces.Box(
+            low=0, high=2 * np.pi, shape=self.device_states_shape, dtype=np.float32
+        )
+        tx_position_space = spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
+        rx_position_space = spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
+        self.observation_space = spaces.Dict(
+            {
+                "device_states": device_states_space,
+                "tx_position": tx_position_space,
+                "rx_position": rx_position_space,
+            }
         )
 
         # Action outputs the angle delta of the beamforming vector
@@ -49,12 +60,14 @@ class WirelessEnv(Env):
         self.action_space = spaces.Box(
             low=-np.pi / 4,
             high=np.pi / 4,
-            shape=self.observation_shape,
+            shape=self.device_states_shape,
             dtype=np.float32,
         )
 
         # State of all devices
-        self.device_states = None
+        self._device_states = None
+        self._tx_position = None
+        self._rx_position = None
         self.info = None
 
     def reset(self, seed=None, options=None):
@@ -63,14 +76,27 @@ class WirelessEnv(Env):
         self.ep_step = 0
 
         # Random initial state
-        self.device_states = np.random.uniform(
-            0, 2 * np.pi, size=self.observation_shape
+        self._device_states = np.random.uniform(
+            0, 2 * np.pi, size=self.device_states_shape
         )
-        self.device_states = np.asarray(self.device_states, dtype=np.float32)
-        self.device_states = np.clip(self.device_states, 0, 2 * np.pi)
+        self._device_states = np.asarray(self._device_states, dtype=np.float32)
+        self._device_states = np.clip(self._device_states, 0, 2 * np.pi)
+
+        self._tx_position = self._default_tx_position
+        self._rx_position = self._default_rx_position
 
         self.info = {"episode": {"r": 0, "l": 0}}
-        return self.device_states, self.info
+        self.info.update(
+            {"tx_position": self._tx_position, "rx_position": self._rx_position}
+        )
+        return self._get_obs(), self.info
+
+    def _get_obs(self):
+        return {
+            "device_states": self._device_states,
+            "tx_position": self._tx_position,
+            "rx_position": self._rx_position,
+        }
 
     def step(self, action, **kwargs):
 
@@ -81,13 +107,16 @@ class WirelessEnv(Env):
         self.ep_step += 1
         truncated = False
 
-        # next observation
-        self.device_states = self.device_states + action
-        self.device_states = np.clip(self.device_states, 0, 2 * np.pi)
-        next_observation = self.device_states
-
         # reward
-        reward = self._cal_reward(self.device_states)
+        ## Save device_states to a tmp file
+        ## Open Blender to read the file and assign values to devices' tiles
+        ## Then export the geometry file to Sionna
+        reward = self._cal_reward(self._device_states)
+
+        # next observation
+        self._device_states = self._device_states + action
+        self._device_states = np.clip(self._device_states, 0, 2 * np.pi)
+        next_observation = self._get_obs()
 
         # info
         self.info.update({"episode": {"r": reward, "l": self.ep_step}})
@@ -104,33 +133,55 @@ class WirelessEnv(Env):
         Returns:
             float: Reward value.
 
-        This uses both Blender and Sionna for the reward calculation.
-        Device states are the rotation angle (in radians) of all devices' tiles.
+        This function calculates the reward for the wireless environment based on the given device states.
+        The device states represent the rotation angle (in radians) of all devices' tiles.
 
-        the variable `device_states` is fed into Blender to get a geometry file.
-        The geometry file is then fed into Sionna-based program to produce the path gain, which is transformed into the reward.
+        The reward calculation involves two steps:
+        1. The device states are used to generate a geometry file using Blender.
+        2. The generated geometry file is then fed into a Sionna-based program to calculate the path gain, which is transformed into the reward.
+
+        Before the reward calculation, the configuration file is modified to set the transmitter and receiver positions, as well as other parameters.
+
+        Note: This function assumes that the necessary environment variables (BLENDER_APP, BLENDER_DIR, SIGMAP_DIR, ASSETS_DIR, TMP_DIR) are properly set.
+
         """
 
         # Config modifications
         config = {}
         config["tx_position"] = [1.0, 0.0, 1.5]
         config["rx_position"] = [-3.0, -4.2, 1.5]
-        config["cm_num_samples"] = 2e6
+        config["cm_num_samples"] = 1e6
         config["cm_max_depth"] = 15
-        config["path_num_samples"] = 3e6
+        config["path_num_samples"] = 1e6
         config["path_max_depth"] = 2
         self._modify_config_file(self.sionna_config_file, **config)
 
+        # Generate geometry file
+        self._run_blender(device_states)
+
+        # Run Sionna to get reward
+        reward = self._run_sionna()
+
+        return reward
+
+    def _run_blender(self, device_states):
         # Blender export
-        blender_app = os.getenv("BLENDER_APP")
-        blender_dir = os.getenv("BLENDER_DIR")
-        sigmap_dir = os.getenv("SIGMAP_DIR")
-        assets_dir = os.getenv("ASSETS_DIR")
+
+        blender_app = utils.get_os_dir("BLENDER_APP")
+        blender_dir = utils.get_os_dir("BLENDER_DIR")
+        sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
+        assets_dir = utils.get_os_dir("ASSETS_DIR")
         blender_output_dir = os.path.join(assets_dir, "blender")
+        tmp_dir = utils.get_tmp_dir()
+
+        tmp_file = os.path.join(tmp_dir, "device_states.pkl")
+        with open(tmp_file, "wb") as f:
+            pickle.dump(device_states, f)
 
         blender_script = os.path.join(
             sigmap_dir, "sigmap", "blender_script", "bl_drl.py"
         )
+        bl_output_txt = os.path.join(tmp_dir, "bl_outputs.txt")
         blender_command = [
             blender_app,
             "-b",
@@ -144,10 +195,21 @@ class WirelessEnv(Env):
             blender_output_dir,
         ]
         try:
-            subprocess.run(blender_command, check=True)
+            subprocess.run(blender_command, check=True, stdout=open(bl_output_txt, "a"))
         except subprocess.CalledProcessError as e:
-            print(f"Error running Blender command: {e}")
-            exit(1)
+            os.remove(tmp_file)
+            raise Exception(f"Error running Blender command: {e}")
+        finally:
+            os.remove(tmp_file)
+
+    def _run_sionna(self) -> float:
+        path_gain = self._cal_path_gain()
+        return path_gain
+
+    def _cal_path_gain(self) -> float:
+        sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
+        assets_dir = utils.get_assets_dir()
+        tmp_dir = utils.get_tmp_dir()
 
         # Sionna simulation
         scene_name = utils.load_yaml_file(self.sionna_config_file)["scene_name"]
@@ -181,9 +243,8 @@ class WirelessEnv(Env):
             .decode()
             .strip()
         )
-        print(f"\nCompute scene path: {compute_scene_path}")
-        print(f"Viz scene path: {viz_scene_path}")
 
+        sionna_output_txt = os.path.join(tmp_dir, "sionna_outputs.txt")
         sionna_command = [
             "python",
             os.path.join(sigmap_dir, "sigmap", "sub_tasks", "run_cmap.py"),
@@ -194,15 +255,20 @@ class WirelessEnv(Env):
             "--viz_scene_path",
             viz_scene_path,
             "--cmap_enabled",
-            "--verbose",
+            # "--verbose",
         ]
         try:
-            subprocess.run(sionna_command, check=True)
+            subprocess.run(
+                sionna_command, check=True, stdout=open(sionna_output_txt, "a")
+            )
         except subprocess.CalledProcessError as e:
-            print(f"Error running Sionna command: {e}")
-            exit(1)
+            raise Exception(f"Error running Sionna command: {e}")
 
-        return 0.0
+        results_file = os.path.join(tmp_dir, "path_gain.txt")
+        with open(results_file, "r") as f:
+            results_dict = json.load(f)
+        path_gain = results_dict["path_gain"]
+        return path_gain
 
     def _modify_config_file(self, config_file, **kwargs):
         config_kwargs = utils.load_yaml_file(config_file)
