@@ -35,21 +35,21 @@ class WirelessEnv(Env):
         self._default_rx_position = config_kwargs["rx_position"]
 
         # Observation space
-        self.device_states_shape = (
+        self.device_state_shape = (
             self.num_devices,
             self.num_tiles_per_device,
             self.controlled_elements,
         )
 
         # Rotation is in radians, [0, 2pi]
-        device_states_space = spaces.Box(
-            low=0, high=2 * np.pi, shape=self.device_states_shape, dtype=np.float32
+        device_state_space = spaces.Box(
+            low=0, high=2 * np.pi, shape=self.device_state_shape, dtype=np.float32
         )
         tx_position_space = spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
         rx_position_space = spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
         self.observation_space = spaces.Dict(
             {
-                "device_states": device_states_space,
+                "device_state": device_state_space,
                 "tx_position": tx_position_space,
                 "rx_position": rx_position_space,
             }
@@ -60,12 +60,12 @@ class WirelessEnv(Env):
         self.action_space = spaces.Box(
             low=-np.pi / 4,
             high=np.pi / 4,
-            shape=self.device_states_shape,
+            shape=self.device_state_shape,
             dtype=np.float32,
         )
 
         # State of all devices
-        self._device_states = None
+        self._device_state = None
         self._tx_position = None
         self._rx_position = None
         self.info = None
@@ -76,11 +76,11 @@ class WirelessEnv(Env):
         self.ep_step = 0
 
         # Random initial state
-        self._device_states = np.random.uniform(
-            0, 2 * np.pi, size=self.device_states_shape
+        self._device_state = np.random.uniform(
+            0, 2 * np.pi, size=self.device_state_shape
         )
-        self._device_states = np.asarray(self._device_states, dtype=np.float32)
-        self._device_states = np.clip(self._device_states, 0, 2 * np.pi)
+        self._device_state = np.asarray(self._device_state, dtype=np.float32)
+        self._device_state = np.clip(self._device_state, 0, 2 * np.pi)
 
         self._tx_position = self._default_tx_position
         self._rx_position = self._default_rx_position
@@ -93,7 +93,7 @@ class WirelessEnv(Env):
 
     def _get_obs(self):
         return {
-            "device_states": self._device_states,
+            "device_state": self._device_state,
             "tx_position": self._tx_position,
             "rx_position": self._rx_position,
         }
@@ -108,14 +108,14 @@ class WirelessEnv(Env):
         truncated = False
 
         # reward
-        ## Save device_states to a tmp file
+        ## Save device_state to a tmp file
         ## Open Blender to read the file and assign values to devices' tiles
         ## Then export the geometry file to Sionna
-        reward = self._cal_reward(self._device_states)
+        reward = self._cal_reward(self._device_state)
 
         # next observation
-        self._device_states = self._device_states + action
-        self._device_states = np.clip(self._device_states, 0, 2 * np.pi)
+        self._device_state = self._device_state + action
+        self._device_state = np.clip(self._device_state, 0, 2 * np.pi)
         next_observation = self._get_obs()
 
         # info
@@ -123,12 +123,12 @@ class WirelessEnv(Env):
 
         return next_observation, reward, terminated, truncated, self.info
 
-    def _cal_reward(self, device_states):
+    def _cal_reward(self, device_state):
         """
         Reward function for the wireless environment.
 
         Args:
-            device_states (np.ndarray): States of all devices. Shape: (num_devices, num_tiles_per_device, controlled_elements).
+            device_state (np.ndarray): States of all devices. Shape: (num_devices, num_tiles_per_device, controlled_elements).
 
         Returns:
             float: Reward value.
@@ -157,14 +157,14 @@ class WirelessEnv(Env):
         self._modify_config_file(self.sionna_config_file, **config)
 
         # Generate geometry file
-        self._run_blender(device_states)
+        self._run_blender(device_state)
 
         # Run Sionna to get reward
         reward = self._run_sionna()
 
         return reward
 
-    def _run_blender(self, device_states):
+    def _run_blender(self, device_state):
         # Blender export
 
         blender_app = utils.get_os_dir("BLENDER_APP")
@@ -174,9 +174,9 @@ class WirelessEnv(Env):
         blender_output_dir = os.path.join(assets_dir, "blender")
         tmp_dir = utils.get_tmp_dir()
 
-        tmp_file = os.path.join(tmp_dir, "device_states.pkl")
+        tmp_file = os.path.join(tmp_dir, "device_state.pkl")
         with open(tmp_file, "wb") as f:
-            pickle.dump(device_states, f)
+            pickle.dump(device_state, f)
 
         blender_script = os.path.join(
             sigmap_dir, "sigmap", "blender_script", "bl_drl.py"
