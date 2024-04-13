@@ -43,10 +43,10 @@ class DataBatch:
         done = done.tolist() if isinstance(done, np.ndarray) else done
 
         self.batch = {
-            "next_observation": next_observation,
+            "observation": observation,
             "action": action,
             "reward": reward,
-            "observation": observation,
+            "next_observation": next_observation,
             "done": done,
         }
 

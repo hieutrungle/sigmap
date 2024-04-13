@@ -96,3 +96,62 @@ class MLPPolicy(nn.Module):
                 return make_multi_normal(mean, std)
 
         return action_distribution
+
+
+class WirelessMLPPolicy(nn.Module):
+    """
+    Base MLP policy for Wireless DRL, which can take an observation and output a distribution over actions.
+
+    This class implements `forward()` which takes a (batched) observation and returns a distribution over actions.
+    """
+
+    def __init__(
+        self,
+        ac_shape: int,
+        discrete: bool,
+        n_layers: int,
+        layer_size: int,
+        use_tanh: bool = False,
+        state_dependent_std: bool = False,
+        fixed_std: Optional[float] = None,
+    ):
+
+        super().__init__()
+
+        self.use_tanh = use_tanh
+        self.discrete = discrete
+        self.state_dependent_std = state_dependent_std
+        self.fixed_std = fixed_std
+
+        if discrete:
+            self.logits_net = ptu.build_mlp_wireless(
+                input_size=ob_dim,
+                output_size=ac_dim,
+                n_layers=n_layers,
+                size=layer_size,
+            ).to(ptu.DEVICE)
+        else:
+            if self.state_dependent_std:
+                assert fixed_std is None
+                self.net = ptu.build_mlp_wireless(
+                    input_size=ob_dim,
+                    output_size=2 * ac_dim,
+                    n_layers=n_layers,
+                    size=layer_size,
+                ).to(ptu.DEVICE)
+            else:
+                self.net = ptu.build_mlp_wireless(
+                    input_size=ob_dim,
+                    output_size=ac_dim,
+                    n_layers=n_layers,
+                    size=layer_size,
+                ).to(ptu.DEVICE)
+
+                if self.fixed_std:
+                    self.std = 0.1
+                else:
+                    self.std = nn.Parameter(
+                        torch.full(
+                            (ac_dim,), 0.0, dtype=torch.float32, device=ptu.DEVICE
+                        )
+                    )
