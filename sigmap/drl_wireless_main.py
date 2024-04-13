@@ -88,6 +88,8 @@ def run_training_loop(
     observation, info = env.reset()
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
+
+        # accumulate data in replay buffer
         if step < drl_config.random_steps:
             action = env.action_space.sample()
         else:
@@ -96,9 +98,42 @@ def run_training_loop(
         next_observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
         done = done or info.get("episode", {}).get("l", 0) >= ep_len
-        replay_buffer.insert(observation, action, reward, next_observation, done)
-        # TODO: train Actor-Critic
-        if step == 2:
+        replay_buffer.insert(
+            observation=observation,
+            action=action,
+            reward=reward,
+            next_observation=next_observation,
+            done=done,
+        )
+        if done:
+            tsb_logger.log_scalar(info["episode"]["r"], "train_return", step)
+            tsb_logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
+            observation, info = env.reset()
+        else:
+            observation = next_observation
+
+        # train agent
+        if step > drl_config.training_starts:
+            batches = replay_buffer.sample(drl_config.batch_size)
+            obs, actions, rewards, next_obs, dones = [], [], [], [], []
+            for batch in batches:
+                obs.append(batch["observation"])
+                actions.append(batch["action"])
+                rewards.append(batch["reward"])
+                next_obs.append(batch["next_observation"])
+                dones.append(batch["done"])
+            update_info = agent.update(obs, action, reward, next_obs, done)
+
+            # logging
+            update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
+            update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]
+
+            if step % args.log_interval == 0:
+                for k, v in update_info.items():
+                    tsb_logger.log_scalar(v, k, step)
+                tsb_logger.flush()
+
+        if step == 10:
             break
     print(f"len of replay buffer: {len(replay_buffer)}")
     return
