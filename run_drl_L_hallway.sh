@@ -36,7 +36,7 @@ echo Blender directory: $BLENDER_DIR
 echo Coverage map directory: $SIGMAP_DIR
 echo -e Assets directory: $ASSETS_DIR '\n'
 
-CONFIG_FILE=${SIGMAP_DIR}/config/tmp_tmp_L_hallway.yaml
+CONFIG_FILE=${SIGMAP_DIR}/config/drl_L_hallway.yaml
 
 # Find the blender executable
 for file in ${BLENDER_DIR}/*
