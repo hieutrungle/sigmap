@@ -3,10 +3,12 @@ import re
 import subprocess
 import pickle
 import json
+from typing import Tuple
 
 import numpy as np
 from gymnasium import Env, spaces
 from sigmap.utils import utils
+from sigmap.drl.infrastructure.data_type import Observation
 
 
 class WirelessEnv(Env):
@@ -31,8 +33,8 @@ class WirelessEnv(Env):
 
         self.sionna_config_file = sionna_config_file
         config_kwargs = utils.load_yaml_file(sionna_config_file)
-        self._default_tx_position = config_kwargs["tx_position"]
-        self._default_rx_position = config_kwargs["rx_position"]
+        self._default_tx_position = np.array(config_kwargs["tx_position"])
+        self._default_rx_position = np.array(config_kwargs["rx_position"])
 
         # Observation space
         self.device_state_shape = (
@@ -70,7 +72,7 @@ class WirelessEnv(Env):
         self._rx_position = None
         self.info = None
 
-    def reset(self, seed=None, options=None):
+    def reset(self, seed=None, options=None) -> Tuple[dict, dict]:
         super().reset(seed=seed, options=options)
         self.ep_return = 0
         self.ep_step = 0
@@ -82,8 +84,8 @@ class WirelessEnv(Env):
         self._device_state = np.asarray(self._device_state, dtype=np.float32)
         self._device_state = np.clip(self._device_state, 0, 2 * np.pi)
 
-        self._tx_position = self._default_tx_position
-        self._rx_position = self._default_rx_position
+        self._tx_position = np.asarray(self._default_tx_position, dtype=np.float32)
+        self._rx_position = np.asarray(self._default_rx_position, dtype=np.float32)
 
         self.info = {"episode": {"r": 0, "l": 0}}
         self.info.update(
@@ -91,14 +93,17 @@ class WirelessEnv(Env):
         )
         return self._get_obs(), self.info
 
-    def _get_obs(self):
-        return {
-            "device_state": self._device_state,
-            "tx_position": self._tx_position,
-            "rx_position": self._rx_position,
+    def _get_obs(self) -> dict:
+        observation = {
+            "device_state": np.asarray(self._device_state, dtype=np.float32),
+            "tx_position": np.asarray(self._tx_position, dtype=np.float32),
+            "rx_position": np.asarray(self._rx_position, dtype=np.float32),
         }
+        return observation
 
-    def step(self, action, **kwargs):
+    def step(
+        self, action: np.ndarray, **kwargs
+    ) -> Tuple[dict, float, bool, bool, dict]:
 
         # termination
         terminated = False
