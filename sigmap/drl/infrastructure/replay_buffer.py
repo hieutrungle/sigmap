@@ -5,14 +5,17 @@ import os
 import json
 import glob
 
+from sigmap.drl.infrastructure.data_type import Observation, Observations
+from sigmap.utils import utils
+
 
 class DataBatch:
     def __init__(
         self,
-        observation: dict[Union[np.ndarray, list]] = None,
+        observation: Observation = None,
         action: np.ndarray = None,
         reward: np.ndarray = None,
-        next_observation: dict[Union[np.ndarray, list]] = None,
+        next_observation: Observation = None,
         done: np.ndarray = None,
     ):
         """
@@ -30,10 +33,10 @@ class DataBatch:
 
     def _set_batch(
         self,
-        observation: dict[Union[np.ndarray, list]],
+        observation: Observation,
         action: np.ndarray,
         reward: np.ndarray,
-        next_observation: dict[Union[np.ndarray, list]],
+        next_observation: Observation,
         done: np.ndarray,
     ):
         observation = self._convert_to_python_type(observation)
@@ -207,7 +210,7 @@ class DataBatches:
         return iter(self.batches)
 
 
-class WirelessReplayBuffer(DataBatches):
+class WirelessReplayBuffer:
     def __init__(
         self,
         buffer_size: int = 100000,
@@ -223,10 +226,15 @@ class WirelessReplayBuffer(DataBatches):
         super().__init__()
         self.max_size = buffer_size
         self.size_counter = 0
-        self.batches: list[DataBatch] = []
         self.saved_dir = saved_dir
         self.name = name
         self.prefix_idx = prefix_idx
+
+        self.observations: Observations = None
+        self.actions: np.ndarray = None
+        self.rewards: np.ndarray = None
+        self.next_observations: Observations = None
+        self.dones: np.ndarray = None
 
     def sample(self, batch_size: int) -> list[DataBatch]:
 
@@ -244,10 +252,10 @@ class WirelessReplayBuffer(DataBatches):
     def insert(
         self,
         /,
-        observation: dict[Union[np.ndarray, list]],
+        observation: dict,
         action: np.ndarray,
         reward: np.ndarray,
-        next_observation: dict[Union[np.ndarray, list]],
+        next_observation: dict,
         done: np.ndarray,
         is_saved: bool = True,
     ):
@@ -264,91 +272,276 @@ class WirelessReplayBuffer(DataBatches):
             )
         """
 
-        batch = DataBatch(
-            observation=observation,
-            action=action,
-            reward=reward,
-            next_observation=next_observation,
-            done=done,
+        if self.observations is None:
+            self.observations = Observations(
+                device_state=observation["device_state"][None],
+                tx_position=observation["tx_position"][None],
+                rx_position=observation["rx_position"][None],
+                size=self.max_size,
+            )
+            self.actions = np.empty((self.max_size, *action.shape), dtype=action.dtype)
+            self.rewards = np.empty((self.max_size, *reward.shape), dtype=reward.dtype)
+            self.next_observations = Observations(
+                device_state=next_observation["device_state"][None],
+                tx_position=next_observation["tx_position"][None],
+                rx_position=next_observation["rx_position"][None],
+                size=self.max_size,
+            )
+            self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
+
+        observations = Observations(
+            device_state=observation["device_state"][None],
+            tx_position=observation["tx_position"][None],
+            rx_position=observation["rx_position"][None],
         )
-
-        # If the replay buffer is empty, fill it with the first batch
-        # This prevent allocating memory for future batches
-        if len(self.batches) == 0:
-            self.batches = [batch for _ in range(self.max_size)]
-
+        next_observations = Observations(
+            device_state=next_observation["device_state"][None],
+            tx_position=next_observation["tx_position"][None],
+            rx_position=next_observation["rx_position"][None],
+        )
         cur_idx = self.size_counter % self.max_size
-        self.batches[cur_idx] = batch
+        self.observations[cur_idx] = observations
+        self.actions[cur_idx] = action
+        self.rewards[cur_idx] = reward
+        self.next_observations[cur_idx] = next_observations
+        self.dones[cur_idx] = done
 
+        # Save the batch to a file
         if is_saved:
             saved_path = os.path.join(
                 self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
             )
-            batch.save(saved_path)
+            self.save_data_to_file(
+                saved_path, observation, action, reward, next_observation, done
+            )
 
         self.size_counter += 1
         if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
             self.prefix_idx += 1
 
-    def batched_insert(
+    def save_data_to_file(
         self,
-        /,
-        observations: list[dict[Union[np.ndarray, list]]],
-        actions: list[np.ndarray],
-        rewards: list[np.ndarray],
-        next_observations: list[dict[Union[np.ndarray, list]]],
-        dones: list[np.ndarray],
-        is_saved: bool = True,
+        saved_path: str,
+        observation: dict,
+        action: np.ndarray,
+        reward: np.ndarray,
+        next_observation: dict,
+        done: np.ndarray,
     ) -> None:
-        """
-        Insert a batch of transitions into the replay buffer.
-        """
-        batches = DataBatches(
-            observations=observations,
-            actions=actions,
-            rewards=rewards,
-            next_observations=next_observations,
-            dones=dones,
-        )
+        batch = {
+            "observation": observation,
+            "action": action,
+            "reward": reward,
+            "next_observation": next_observation,
+            "done": done,
+        }
+        with open(saved_path, "a") as f:
+            json.dump(batch, f, cls=utils.NpEncoder)
+            f.write("\n")
 
-        # If the replay buffer is empty, fill it with the first batch
-        # This prevent allocating memory for future batches
-        if len(self.batches) == 0:
-            self.batches = [batches[0] for _ in range(self.max_size)]
+    # def batched_insert(
+    #     self,
+    #     /,
+    #     observations: list[dict[Union[np.ndarray, list]]],
+    #     actions: list[np.ndarray],
+    #     rewards: list[np.ndarray],
+    #     next_observations: list[dict[Union[np.ndarray, list]]],
+    #     dones: list[np.ndarray],
+    #     is_saved: bool = True,
+    # ) -> None:
+    #     """
+    #     Insert a batch of transitions into the replay buffer.
+    #     """
+    #     batches = DataBatches(
+    #         observations=observations,
+    #         actions=actions,
+    #         rewards=rewards,
+    #         next_observations=next_observations,
+    #         dones=dones,
+    #     )
 
-        indices = (
-            np.arange(self.size_counter, self.size_counter + len(actions))
-            % self.max_size
-        )
-        for i, target_idx in enumerate(indices):
-            self.batches[target_idx] = batches[i]
+    #     # If the replay buffer is empty, fill it with the first batch
+    #     # This prevent allocating memory for future batches
+    #     if len(self.batches) == 0:
+    #         self.batches = [batches[0] for _ in range(self.max_size)]
 
-        if is_saved:
-            saved_path = os.path.join(
-                self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
-            )
-            batches.save(saved_path)
+    #     indices = (
+    #         np.arange(self.size_counter, self.size_counter + len(actions))
+    #         % self.max_size
+    #     )
+    #     for i, target_idx in enumerate(indices):
+    #         self.batches[target_idx] = batches[i]
 
-        # Increment index for saving to a new file
-        self.size_counter += len(actions)
-        if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
-            self.prefix_idx += 1
+    #     if is_saved:
+    #         saved_path = os.path.join(
+    #             self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
+    #         )
+    #         batches.save(saved_path)
 
-    def load_replay_buffer(self):
-        filepaths = glob.glob(os.path.join(self.saved_dir, f"{self.name}_*.txt"))
-        for file in filepaths:
-            batches = DataBatches()
-            batches.load(file)
+    #     # Increment index for saving to a new file
+    #     self.size_counter += len(actions)
+    #     if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
+    #         self.prefix_idx += 1
 
-            for batch in batches:
-                self.insert(
-                    observation=batch["observation"],
-                    action=batch["action"],
-                    reward=batch["reward"],
-                    next_observation=batch["next_observation"],
-                    done=batch["done"],
-                    is_saved=False,
-                )
+    # def load_replay_buffer(self):
+    #     filepaths = glob.glob(os.path.join(self.saved_dir, f"{self.name}_*.txt"))
+    #     for file in filepaths:
+    #         batches = DataBatches()
+    #         batches.load(file)
+
+    #         for batch in batches:
+    #             self.insert(
+    #                 observation=batch["observation"],
+    #                 action=batch["action"],
+    #                 reward=batch["reward"],
+    #                 next_observation=batch["next_observation"],
+    #                 done=batch["done"],
+    #                 is_saved=False,
+    #             )
+
+
+# class WirelessReplayBuffer(DataBatches):
+#     def __init__(
+#         self,
+#         buffer_size: int = 100000,
+#         saved_dir="",
+#         name="wireless_replay_buffer",
+#         prefix_idx=0,
+#     ):
+#         """
+#         A replay buffer for wireless environments.
+
+#         It is an empty DataBaches object with the ability to insert data.
+#         """
+#         super().__init__()
+#         self.max_size = buffer_size
+#         self.size_counter = 0
+#         self.batches: list[DataBatch] = []
+#         self.saved_dir = saved_dir
+#         self.name = name
+#         self.prefix_idx = prefix_idx
+
+#     def sample(self, batch_size: int) -> list[DataBatch]:
+
+#         rand_indices = (
+#             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
+#         )
+#         batches = []
+#         for rand_idx in rand_indices:
+#             batches.append(self.batches[rand_idx])
+#         return batches
+
+#     def __len__(self):
+#         return self.size_counter
+
+#     def insert(
+#         self,
+#         /,
+#         observation: dict[Union[np.ndarray, list]],
+#         action: np.ndarray,
+#         reward: np.ndarray,
+#         next_observation: dict[Union[np.ndarray, list]],
+#         done: np.ndarray,
+#         is_saved: bool = True,
+#     ):
+#         """
+#         Insert a single transition into the replay buffer.
+
+#         Use like:
+#             replay_buffer.insert(
+#                 observation=observation,
+#                 action=action,
+#                 reward=reward,
+#                 next_observation=next_observation,
+#                 done=done,
+#             )
+#         """
+
+#         batch = DataBatch(
+#             observation=observation,
+#             action=action,
+#             reward=reward,
+#             next_observation=next_observation,
+#             done=done,
+#         )
+
+#         # If the replay buffer is empty, fill it with the first batch
+#         # This prevent allocating memory for future batches
+#         if len(self.batches) == 0:
+#             self.batches = [batch for _ in range(self.max_size)]
+
+#         cur_idx = self.size_counter % self.max_size
+#         self.batches[cur_idx] = batch
+
+#         if is_saved:
+#             saved_path = os.path.join(
+#                 self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
+#             )
+#             batch.save(saved_path)
+
+#         self.size_counter += 1
+#         if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
+#             self.prefix_idx += 1
+
+#     def batched_insert(
+#         self,
+#         /,
+#         observations: list[dict[Union[np.ndarray, list]]],
+#         actions: list[np.ndarray],
+#         rewards: list[np.ndarray],
+#         next_observations: list[dict[Union[np.ndarray, list]]],
+#         dones: list[np.ndarray],
+#         is_saved: bool = True,
+#     ) -> None:
+#         """
+#         Insert a batch of transitions into the replay buffer.
+#         """
+#         batches = DataBatches(
+#             observations=observations,
+#             actions=actions,
+#             rewards=rewards,
+#             next_observations=next_observations,
+#             dones=dones,
+#         )
+
+#         # If the replay buffer is empty, fill it with the first batch
+#         # This prevent allocating memory for future batches
+#         if len(self.batches) == 0:
+#             self.batches = [batches[0] for _ in range(self.max_size)]
+
+#         indices = (
+#             np.arange(self.size_counter, self.size_counter + len(actions))
+#             % self.max_size
+#         )
+#         for i, target_idx in enumerate(indices):
+#             self.batches[target_idx] = batches[i]
+
+#         if is_saved:
+#             saved_path = os.path.join(
+#                 self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
+#             )
+#             batches.save(saved_path)
+
+#         # Increment index for saving to a new file
+#         self.size_counter += len(actions)
+#         if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
+#             self.prefix_idx += 1
+
+#     def load_replay_buffer(self):
+#         filepaths = glob.glob(os.path.join(self.saved_dir, f"{self.name}_*.txt"))
+#         for file in filepaths:
+#             batches = DataBatches()
+#             batches.load(file)
+
+#             for batch in batches:
+#                 self.insert(
+#                     observation=batch["observation"],
+#                     action=batch["action"],
+#                     reward=batch["reward"],
+#                     next_observation=batch["next_observation"],
+#                     done=batch["done"],
+#                     is_saved=False,
+#                 )
 
 
 # class WirelessReplayBuffer:
