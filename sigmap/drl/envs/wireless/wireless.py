@@ -73,6 +73,14 @@ class WirelessEnv(Env):
         self._rx_position = None
         self.info = None
 
+    def _get_obs(self) -> dict:
+        observation = {
+            "device_state": np.asarray(self._device_state, dtype=np.float32),
+            "tx_position": np.asarray(self._tx_position, dtype=np.float32),
+            "rx_position": np.asarray(self._rx_position, dtype=np.float32),
+        }
+        return observation
+
     def reset(self, seed=None, options=None) -> Tuple[dict, dict]:
         super().reset(seed=seed, options=options)
         self.ep_return = 0
@@ -93,14 +101,6 @@ class WirelessEnv(Env):
             {"tx_position": self._tx_position, "rx_position": self._rx_position}
         )
         return self._get_obs(), self.info
-
-    def _get_obs(self) -> dict:
-        observation = {
-            "device_state": np.asarray(self._device_state, dtype=np.float32),
-            "tx_position": np.asarray(self._tx_position, dtype=np.float32),
-            "rx_position": np.asarray(self._rx_position, dtype=np.float32),
-        }
-        return observation
 
     def step(
         self, action: np.ndarray, **kwargs
