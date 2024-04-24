@@ -9,6 +9,7 @@ import numpy as np
 from gymnasium import Env, spaces
 from sigmap.utils import utils
 from sigmap.drl.infrastructure.data_type import Observation
+import sigmap
 
 
 class WirelessEnv(Env):
@@ -212,9 +213,7 @@ class WirelessEnv(Env):
         return path_gain
 
     def _cal_path_gain(self) -> float:
-        sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
         assets_dir = utils.get_assets_dir()
-        tmp_dir = utils.get_tmp_dir()
 
         # Sionna simulation
         scene_name = utils.load_yaml_file(self.sionna_config_file)["scene_name"]
@@ -248,31 +247,16 @@ class WirelessEnv(Env):
             .decode()
             .strip()
         )
+        config = sigmap.utils.scripting_utils.make_sionna_config(
+            self.sionna_config_file
+        )
+        sig_cmap = sigmap.compute.signal_cmap.SignalCoverageMap(
+            config, compute_scene_path, viz_scene_path
+        )
+        coverage_map = sig_cmap.compute_cmap()
+        path_gain = sig_cmap.get_path_gain(coverage_map)
+        path_gain = np.array(path_gain)
 
-        sionna_output_txt = os.path.join(tmp_dir, "sionna_outputs.txt")
-        sionna_command = [
-            "python",
-            os.path.join(sigmap_dir, "sigmap", "sub_tasks", "run_cmap.py"),
-            "-cfg",
-            self.sionna_config_file,
-            "--compute_scene_path",
-            compute_scene_path,
-            "--viz_scene_path",
-            viz_scene_path,
-            "--cmap_enabled",
-            # "--verbose",
-        ]
-        try:
-            subprocess.run(
-                sionna_command, check=True, stdout=open(sionna_output_txt, "a")
-            )
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Error running Sionna command: {e}")
-
-        results_file = os.path.join(tmp_dir, "path_gain.txt")
-        with open(results_file, "r") as f:
-            results_dict = json.load(f)
-        path_gain = results_dict["path_gain"]
         return path_gain
 
     def _modify_config_file(self, config_file, **kwargs):
