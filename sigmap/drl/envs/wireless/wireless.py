@@ -36,6 +36,9 @@ class WirelessEnv(Env):
         config_kwargs = utils.load_yaml_file(sionna_config_file)
         self._default_tx_position = np.array(config_kwargs["tx_position"])
         self._default_rx_position = np.array(config_kwargs["rx_position"])
+        # TODO: Now we only have 1 TX and 1 RX, need to update this for multiple TX and RX
+        self._default_tx_position = np.expand_dims(self._default_tx_position, axis=0)
+        self._default_rx_position = np.expand_dims(self._default_rx_position, axis=0)
 
         # Observation space
         self.device_state_shape = (
@@ -48,8 +51,12 @@ class WirelessEnv(Env):
         device_state_space = spaces.Box(
             low=0, high=2 * np.pi, shape=self.device_state_shape, dtype=np.float32
         )
-        tx_position_space = spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
-        rx_position_space = spaces.Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
+        tx_position_space = spaces.Box(
+            -np.inf, np.inf, shape=self._default_tx_position.shape, dtype=np.float32
+        )
+        rx_position_space = spaces.Box(
+            -np.inf, np.inf, shape=self._default_rx_position.shape, dtype=np.float32
+        )
         self.observation_space = spaces.Dict(
             {
                 "device_state": device_state_space,
