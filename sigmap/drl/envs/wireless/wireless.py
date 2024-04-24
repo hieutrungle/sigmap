@@ -255,7 +255,7 @@ class WirelessEnv(Env):
         )
         coverage_map = sig_cmap.compute_cmap()
         path_gain = sig_cmap.get_path_gain(coverage_map)
-        path_gain = np.array(path_gain)
+        path_gain = float(path_gain)
 
         return path_gain
 
