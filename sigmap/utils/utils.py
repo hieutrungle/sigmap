@@ -215,3 +215,39 @@ def get_os_dir(name):
         raise Exception(f"{name} environment variable is not set.")
     mkdir_not_exists(os_dir)
     return os_dir
+
+
+# Read and write files
+def read_first_line(file_path: str) -> str:
+    with open(file_path, "rb") as f:
+        first_line = f.readline().decode()
+    return first_line
+
+
+def read_last_line(file_path: str) -> str:
+    with open(file_path, "rb") as f:
+        try:  # catch OSError in case of a one line file
+            f.seek(-2, os.SEEK_END)
+            while f.read(1) != b"\n":
+                f.seek(-2, os.SEEK_CUR)
+        except OSError:
+            f.seek(0)
+        last_line = f.readline().decode()
+    return last_line
+
+
+def read_n_to_last_line(filename, n=1) -> str:
+    """Returns the nth before last line of a file (n=1 gives last line)"""
+    num_newlines = 0
+    with open(filename, "rb") as f:
+        try:
+            f.seek(-2, os.SEEK_END)
+            while num_newlines < n:
+                f.seek(-2, os.SEEK_CUR)
+                if f.read(1) == b"\n":
+                    num_newlines += 1
+        except OSError:
+            f.seek(0)
+        n_to_last_line = f.readline().decode()
+
+    return n_to_last_line
