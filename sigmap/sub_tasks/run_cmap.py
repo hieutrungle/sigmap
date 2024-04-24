@@ -29,7 +29,9 @@ def main():
         utils.log_config(config)
 
     # Prepare folders
-    sig_cmap = compute.signal_cmap.SignalCoverageMap(args, config)
+    sig_cmap = compute.signal_cmap.SignalCoverageMap(
+        config, args.compute_scene_path, args.viz_scene_path, args.verbose
+    )
     coverage_map = sig_cmap.compute_cmap() if args.cmap_enabled else None
     paths = sig_cmap.compute_paths() if args.paths_enabled else None
     sig_cmap.render_to_file(coverage_map, paths)
