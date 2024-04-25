@@ -15,8 +15,8 @@ if cmd_folder not in sys.path:
 import bl_utils, bl_parser
 
 
-def export_drl_hallway(args, config):
-    # TODO: get device states from replay buffer
+def export_drl_hallway_device_state(args, config):
+    # // TODO: get device states from replay buffer
     devices = []
     devices_names = []
     for k, v in bpy.data.collections.items():
@@ -67,11 +67,65 @@ def export_drl_hallway(args, config):
     )
 
 
+def export_drl_hallway_focal_pts(args, config):
+
+    # Each device has multiple tiles
+    devices = []
+    devices_names = []
+    for k, v in bpy.data.collections.items():
+        if "Reflector" in k:
+            devices_names.append(k)
+            devices.append(v.objects)
+
+    # Same tmp_file as in wireless.py -> self._cal_reward()
+    tmp_dir = os.getenv("TMP_DIR")
+    tmp_file = os.path.join(tmp_dir, "focal_pts.pkl")
+
+    with open(tmp_file, "rb") as f:
+        focal_pts = pickle.load(f)  # focal_pts: [num_devices, 2, 3]
+
+    for device, focal_pt_tuple in zip(devices, focal_pts):
+        pt1 = focal_pt_tuple[0]
+        pt2 = focal_pt_tuple[1]
+        for tile in device:
+            r, theta, phi = bl_utils.compute_rot_angle_3pts(
+                pt1,
+                bl_utils.get_center_bbox(tile),
+                pt2,
+            )
+            tile.rotation_euler = [0, theta, phi]
+            tile.scale = [0.1, 0.1, 0.01]
+
+    # Save files without ceiling
+    folder_dir = os.path.join(
+        args.output_dir,
+        f"{config.scene_name}",
+        f"idx",
+    )
+    bl_utils.mkdir_with_replacement(folder_dir)
+    bl_utils.save_mitsuba_xml(
+        folder_dir, config.mitsuba_filename, [*devices_names, "Wall", "Floor"]
+    )
+
+    # Save files with ceiling
+    folder_dir = os.path.join(
+        args.output_dir,
+        f"{config.scene_name}",
+        f"ceiling_idx",
+    )
+    bl_utils.mkdir_with_replacement(folder_dir)
+    bl_utils.save_mitsuba_xml(
+        folder_dir,
+        config.mitsuba_filename,
+        [*devices_names, "Wall", "Floor", "Ceiling"],
+    )
+
+
 def main():
     args = create_argparser().parse_args()
     config = bl_utils.make_conf(args.config_file)
-    export_drl_hallway(args, config)
-    # Read device_states from a replay_buffer file
+    export_drl_hallway_focal_pts(args, config)
+    # export_drl_hallway(args, config)
 
 
 def create_argparser() -> bl_parser.ArgumentParserForBlender:
