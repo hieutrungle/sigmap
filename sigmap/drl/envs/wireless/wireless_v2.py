@@ -266,6 +266,7 @@ class WirelessEnvV2(Env):
             config, compute_scene_path, viz_scene_path
         )
         coverage_map = sig_cmap.compute_cmap()
+        sig_cmap.render_to_file(coverage_map)
         path_gain = sig_cmap.get_path_gain(coverage_map)
         path_gain = float(path_gain)
 
