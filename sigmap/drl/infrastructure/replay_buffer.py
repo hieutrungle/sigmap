@@ -5,209 +5,209 @@ import os
 import json
 import glob
 
-from sigmap.drl.infrastructure.data_types import Observation, Observations
+from sigmap.drl.infrastructure.data_types import Observations
 from sigmap.utils import utils
 
 
-class DataBatch:
-    def __init__(
-        self,
-        observation: Observation = None,
-        action: np.ndarray = None,
-        reward: np.ndarray = None,
-        next_observation: Observation = None,
-        done: np.ndarray = None,
-    ):
-        """
-        Construct a DataBatch object from the given data.
-        """
-        self.batch = None
-        if (
-            observation is not None
-            and action is not None
-            and reward is not None
-            and next_observation is not None
-            and done is not None
-        ):
-            self._set_batch(observation, action, reward, next_observation, done)
+# class DataBatch:
+#     def __init__(
+#         self,
+#         observation: Observation = None,
+#         action: np.ndarray = None,
+#         reward: np.ndarray = None,
+#         next_observation: Observation = None,
+#         done: np.ndarray = None,
+#     ):
+#         """
+#         Construct a DataBatch object from the given data.
+#         """
+#         self.batch = None
+#         if (
+#             observation is not None
+#             and action is not None
+#             and reward is not None
+#             and next_observation is not None
+#             and done is not None
+#         ):
+#             self._set_batch(observation, action, reward, next_observation, done)
 
-    def _set_batch(
-        self,
-        observation: Observation,
-        action: np.ndarray,
-        reward: np.ndarray,
-        next_observation: Observation,
-        done: np.ndarray,
-    ):
-        observation = self._convert_to_python_type(observation)
-        action = action.tolist() if isinstance(action, np.ndarray) else action
-        reward = reward.tolist() if isinstance(reward, np.ndarray) else reward
-        next_observation = self._convert_to_python_type(next_observation)
-        done = done.tolist() if isinstance(done, np.ndarray) else done
+#     def _set_batch(
+#         self,
+#         observation: Observation,
+#         action: np.ndarray,
+#         reward: np.ndarray,
+#         next_observation: Observation,
+#         done: np.ndarray,
+#     ):
+#         observation = self._convert_to_python_type(observation)
+#         action = action.tolist() if isinstance(action, np.ndarray) else action
+#         reward = reward.tolist() if isinstance(reward, np.ndarray) else reward
+#         next_observation = self._convert_to_python_type(next_observation)
+#         done = done.tolist() if isinstance(done, np.ndarray) else done
 
-        self.batch = {
-            "observation": observation,
-            "action": action,
-            "reward": reward,
-            "next_observation": next_observation,
-            "done": done,
-        }
+#         self.batch = {
+#             "observation": observation,
+#             "action": action,
+#             "reward": reward,
+#             "next_observation": next_observation,
+#             "done": done,
+#         }
 
-    def _convert_to_python_type(self, data: dict):
-        for key, value in data.items():
-            if isinstance(value, np.ndarray):
-                data[key] = value.tolist()
-        return data
+#     def _convert_to_python_type(self, data: dict):
+#         for key, value in data.items():
+#             if isinstance(value, np.ndarray):
+#                 data[key] = value.tolist()
+#         return data
 
-    def save(self, file_path: str):
-        with open(file_path, "a") as f:
-            json.dump(self.batch, f)
-            f.write("\n")
+#     def save(self, file_path: str):
+#         with open(file_path, "a") as f:
+#             json.dump(self.batch, f)
+#             f.write("\n")
 
-    def load_first_entry(self, file_path: str):
-        """
-        Load the first batch from the file only if the batch is not already predefined
-        """
-        if self.batch is None:
-            self.batch = self.read_first_line(file_path)
-            self.batch = json.loads(self.batch)
+#     def load_first_entry(self, file_path: str):
+#         """
+#         Load the first batch from the file only if the batch is not already predefined
+#         """
+#         if self.batch is None:
+#             self.batch = self.read_first_line(file_path)
+#             self.batch = json.loads(self.batch)
 
-    def load_last_entry(self, file_path: str):
-        """
-        Load the last batch from the file only if the batch is not already predefined
-        """
-        if self.batch is None:
-            self.batch = self.read_last_line(file_path)
-            self.batch = json.loads(self.batch)
+#     def load_last_entry(self, file_path: str):
+#         """
+#         Load the last batch from the file only if the batch is not already predefined
+#         """
+#         if self.batch is None:
+#             self.batch = self.read_last_line(file_path)
+#             self.batch = json.loads(self.batch)
 
-    def read_first_line(self, file_path: str) -> str:
-        with open(file_path, "rb") as f:
-            first_line = f.readline().decode()
-        return first_line
+#     def read_first_line(self, file_path: str) -> str:
+#         with open(file_path, "rb") as f:
+#             first_line = f.readline().decode()
+#         return first_line
 
-    def read_last_line(self, file_path: str) -> str:
-        with open(file_path, "rb") as f:
-            try:  # catch OSError in case of a one line file
-                f.seek(-2, os.SEEK_END)
-                while f.read(1) != b"\n":
-                    f.seek(-2, os.SEEK_CUR)
-            except OSError:
-                f.seek(0)
-            last_line = f.readline().decode()
-        return last_line
+#     def read_last_line(self, file_path: str) -> str:
+#         with open(file_path, "rb") as f:
+#             try:  # catch OSError in case of a one line file
+#                 f.seek(-2, os.SEEK_END)
+#                 while f.read(1) != b"\n":
+#                     f.seek(-2, os.SEEK_CUR)
+#             except OSError:
+#                 f.seek(0)
+#             last_line = f.readline().decode()
+#         return last_line
 
-    def read_n_to_last_line(self, filename, n=1) -> str:
-        """Returns the nth before last line of a file (n=1 gives last line)"""
-        num_newlines = 0
-        with open(filename, "rb") as f:
-            try:
-                f.seek(-2, os.SEEK_END)
-                while num_newlines < n:
-                    f.seek(-2, os.SEEK_CUR)
-                    if f.read(1) == b"\n":
-                        num_newlines += 1
-            except OSError:
-                f.seek(0)
-            n_to_last_line = f.readline().decode()
+#     def read_n_to_last_line(self, filename, n=1) -> str:
+#         """Returns the nth before last line of a file (n=1 gives last line)"""
+#         num_newlines = 0
+#         with open(filename, "rb") as f:
+#             try:
+#                 f.seek(-2, os.SEEK_END)
+#                 while num_newlines < n:
+#                     f.seek(-2, os.SEEK_CUR)
+#                     if f.read(1) == b"\n":
+#                         num_newlines += 1
+#             except OSError:
+#                 f.seek(0)
+#             n_to_last_line = f.readline().decode()
 
-        return n_to_last_line
+#         return n_to_last_line
 
-    def __str__(self):
-        return str(self.batch)
+#     def __str__(self):
+#         return str(self.batch)
 
-    def __repr__(self):
-        return str(self.batch)
+#     def __repr__(self):
+#         return str(self.batch)
 
-    def __getitem__(self, key) -> Union[dict, np.ndarray]:
-        """
-        Get the value of the key in the batch.
-        Permissible keys are "next_observation", "action", "reward", "observation", and "done".
-        """
-        if key not in [
-            "next_observation",
-            "action",
-            "reward",
-            "observation",
-            "done",
-        ]:
-            raise ValueError("Key not found")
-        return self.batch[key]
+#     def __getitem__(self, key) -> Union[dict, np.ndarray]:
+#         """
+#         Get the value of the key in the batch.
+#         Permissible keys are "next_observation", "action", "reward", "observation", and "done".
+#         """
+#         if key not in [
+#             "next_observation",
+#             "action",
+#             "reward",
+#             "observation",
+#             "done",
+#         ]:
+#             raise ValueError("Key not found")
+#         return self.batch[key]
 
-    def __setitem__(self, key, value):
-        if key == "next_observation" or key == "observation":
-            value = self._convert_to_python_type(value)
-        elif key == "action" or key == "reward" or key == "done":
-            value = value.tolist() if isinstance(value, np.ndarray) else value
-        else:
-            raise ValueError("Key not found")
-        self.batch[key] = value
+#     def __setitem__(self, key, value):
+#         if key == "next_observation" or key == "observation":
+#             value = self._convert_to_python_type(value)
+#         elif key == "action" or key == "reward" or key == "done":
+#             value = value.tolist() if isinstance(value, np.ndarray) else value
+#         else:
+#             raise ValueError("Key not found")
+#         self.batch[key] = value
 
-    def __len__(self):
-        return len(self.batch)
+#     def __len__(self):
+#         return len(self.batch)
 
 
-class DataBatches:
-    def __init__(
-        self,
-        observations: list[dict[Union[np.ndarray, list]]] = None,
-        actions: list[np.ndarray] = None,
-        rewards: list[np.ndarray] = None,
-        next_observations: list[dict[Union[np.ndarray, list]]] = None,
-        dones: list[np.ndarray] = None,
-    ):
-        """
-        Construct a list of DataBatch objects from the given data.
-        """
-        self.batches = []
-        if (
-            observations is not None
-            and actions is not None
-            and rewards is not None
-            and next_observations is not None
-            and dones is not None
-        ):
-            self._set_batches(observations, actions, rewards, next_observations, dones)
+# class DataBatches:
+#     def __init__(
+#         self,
+#         observations: list[dict[Union[np.ndarray, list]]] = None,
+#         actions: list[np.ndarray] = None,
+#         rewards: list[np.ndarray] = None,
+#         next_observations: list[dict[Union[np.ndarray, list]]] = None,
+#         dones: list[np.ndarray] = None,
+#     ):
+#         """
+#         Construct a list of DataBatch objects from the given data.
+#         """
+#         self.batches = []
+#         if (
+#             observations is not None
+#             and actions is not None
+#             and rewards is not None
+#             and next_observations is not None
+#             and dones is not None
+#         ):
+#             self._set_batches(observations, actions, rewards, next_observations, dones)
 
-    def _set_batches(
-        self,
-        observations: list[dict[Union[np.ndarray, list]]],
-        actions: list[np.ndarray],
-        rewards: list[np.ndarray],
-        next_observations: list[dict[Union[np.ndarray, list]]],
-        dones: list[np.ndarray],
-    ):
-        self.batches = []
-        for i in range(len(next_observations)):
-            self.batches.append(
-                DataBatch(
-                    observations[i],
-                    actions[i],
-                    rewards[i],
-                    next_observations[i],
-                    dones[i],
-                )
-            )
+#     def _set_batches(
+#         self,
+#         observations: list[dict[Union[np.ndarray, list]]],
+#         actions: list[np.ndarray],
+#         rewards: list[np.ndarray],
+#         next_observations: list[dict[Union[np.ndarray, list]]],
+#         dones: list[np.ndarray],
+#     ):
+#         self.batches = []
+#         for i in range(len(next_observations)):
+#             self.batches.append(
+#                 DataBatch(
+#                     observations[i],
+#                     actions[i],
+#                     rewards[i],
+#                     next_observations[i],
+#                     dones[i],
+#                 )
+#             )
 
-    def save(self, file_path: str):
-        for i, batch in enumerate(self.batches):
-            batch.save(file_path)
+#     def save(self, file_path: str):
+#         for i, batch in enumerate(self.batches):
+#             batch.save(file_path)
 
-    def load(self, file_path: str):
-        with open(file_path, "r") as f:
-            for line in f:
-                self.batches.append(json.loads(line))
+#     def load(self, file_path: str):
+#         with open(file_path, "r") as f:
+#             for line in f:
+#                 self.batches.append(json.loads(line))
 
-    def __len__(self):
-        return len(self.batches)
+#     def __len__(self):
+#         return len(self.batches)
 
-    def __getitem__(self, idx: int) -> DataBatch:
-        return self.batches[idx]
+#     def __getitem__(self, idx: int) -> DataBatch:
+#         return self.batches[idx]
 
-    def __setitem__(self, idx, value):
-        self.batches[idx] = value
+#     def __setitem__(self, idx, value):
+#         self.batches[idx] = value
 
-    def __iter__(self):
-        return iter(self.batches)
+#     def __iter__(self):
+#         return iter(self.batches)
 
 
 class WirelessReplayBuffer:
@@ -236,7 +236,9 @@ class WirelessReplayBuffer:
         self.next_observations: Observations = None
         self.dones: np.ndarray = None
 
-    def sample(self, batch_size: int) -> list[DataBatch]:
+    def sample(
+        self, batch_size: int
+    ) -> Tuple[Observations, np.ndarray, np.ndarray, Observations, np.ndarray]:
 
         rand_indices = list(
             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
@@ -278,29 +280,29 @@ class WirelessReplayBuffer:
         if self.observations is None:
             self.observations = Observations(
                 focal_pts=observation["focal_pts"][None],
-                tx_position=observation["tx_position"][None],
-                rx_position=observation["rx_position"][None],
+                tx_positions=observation["tx_positions"][None],
+                rx_positions=observation["rx_positions"][None],
                 size=self.max_size,
             )
             self.actions = np.empty((self.max_size, *action.shape), dtype=action.dtype)
             self.rewards = np.empty((self.max_size, *reward.shape), dtype=reward.dtype)
             self.next_observations = Observations(
                 focal_pts=next_observation["focal_pts"][None],
-                tx_position=next_observation["tx_position"][None],
-                rx_position=next_observation["rx_position"][None],
+                tx_positions=next_observation["tx_positions"][None],
+                rx_positions=next_observation["rx_positions"][None],
                 size=self.max_size,
             )
             self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
 
         observations = Observations(
             focal_pts=observation["focal_pts"][None],
-            tx_position=observation["tx_position"][None],
-            rx_position=observation["rx_position"][None],
+            tx_positions=observation["tx_positions"][None],
+            rx_positions=observation["rx_positions"][None],
         )
         next_observations = Observations(
             focal_pts=next_observation["focal_pts"][None],
-            tx_position=next_observation["tx_position"][None],
-            rx_position=next_observation["rx_position"][None],
+            tx_positions=next_observation["tx_positions"][None],
+            rx_positions=next_observation["rx_positions"][None],
         )
         cur_idx = self.size_counter % self.max_size
         self.observations[cur_idx] = observations
