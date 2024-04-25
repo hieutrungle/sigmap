@@ -2,13 +2,11 @@ import os
 import re
 import subprocess
 import pickle
-import json
 from typing import Tuple
 
 import numpy as np
 from gymnasium import Env, spaces
 from sigmap.utils import utils
-from sigmap.drl.infrastructure.data_types import Observation
 import sigmap
 
 
@@ -34,11 +32,11 @@ class WirelessEnvV2(Env):
 
         self.sionna_config_file = sionna_config_file
         config_kwargs = utils.load_yaml_file(sionna_config_file)
-        self._default_tx_position = np.array(config_kwargs["tx_position"])
-        self._default_rx_position = np.array(config_kwargs["rx_position"])
+        self._default_tx_positions = np.array(config_kwargs["tx_position"])
+        self._default_rx_positions = np.array(config_kwargs["rx_position"])
         # TODO: Now we only have 1 TX and 1 RX, need to update this for multiple TX and RX
-        self._default_tx_position = np.expand_dims(self._default_tx_position, axis=0)
-        self._default_rx_position = np.expand_dims(self._default_rx_position, axis=0)
+        self._default_tx_positions = np.expand_dims(self._default_tx_positions, axis=0)
+        self._default_rx_positions = np.expand_dims(self._default_rx_positions, axis=0)
 
         # Observation space
         # Each device has 2 focal points
@@ -55,17 +53,17 @@ class WirelessEnvV2(Env):
             shape=self.focal_pts_shape,
             dtype=np.float32,
         )
-        tx_position_space = spaces.Box(
-            -np.inf, np.inf, shape=self._default_tx_position.shape, dtype=np.float32
+        tx_positions_space = spaces.Box(
+            -np.inf, np.inf, shape=self._default_tx_positions.shape, dtype=np.float32
         )
-        rx_position_space = spaces.Box(
-            -np.inf, np.inf, shape=self._default_rx_position.shape, dtype=np.float32
+        rx_positions_space = spaces.Box(
+            -np.inf, np.inf, shape=self._default_rx_positions.shape, dtype=np.float32
         )
         self.observation_space = spaces.Dict(
             {
                 "focal_pts": focal_pts_space,
-                "tx_position": tx_position_space,
-                "rx_position": rx_position_space,
+                "tx_positions": tx_positions_space,
+                "rx_positions": rx_positions_space,
             }
         )
 
@@ -77,15 +75,15 @@ class WirelessEnvV2(Env):
 
         # State of all devices
         self._focal_pts = None
-        self._tx_position = None
-        self._rx_position = None
+        self._tx_positions = None
+        self._rx_positions = None
         self.info = None
 
     def _get_obs(self) -> dict:
         observation = {
             "focal_pts": np.asarray(self._focal_pts, dtype=np.float32),
-            "tx_position": np.asarray(self._tx_position, dtype=np.float32),
-            "rx_position": np.asarray(self._rx_position, dtype=np.float32),
+            "tx_positions": np.asarray(self._tx_positions, dtype=np.float32),
+            "rx_positions": np.asarray(self._rx_positions, dtype=np.float32),
         }
         return observation
 
@@ -103,12 +101,12 @@ class WirelessEnvV2(Env):
             self._focal_pts, self.focal_pts_low, self.focal_pts_high
         )
 
-        self._tx_position = np.asarray(self._default_tx_position, dtype=np.float32)
-        self._rx_position = np.asarray(self._default_rx_position, dtype=np.float32)
+        self._tx_positions = np.asarray(self._default_tx_positions, dtype=np.float32)
+        self._rx_positions = np.asarray(self._default_rx_positions, dtype=np.float32)
 
         self.info = {"episode": {"r": 0, "l": 0}}
         self.info.update(
-            {"tx_position": self._tx_position, "rx_position": self._rx_position}
+            {"tx_positions": self._tx_positions, "rx_positions": self._rx_positions}
         )
         return self._get_obs(), self.info
 
@@ -166,8 +164,8 @@ class WirelessEnvV2(Env):
 
         # Config modifications
         config = {}
-        config["tx_position"] = [1.0, 0.0, 1.5]
-        config["rx_position"] = [-3.0, -4.2, 1.5]
+        config["tx_positions"] = [1.0, 0.0, 1.5]
+        config["rx_positions"] = [-3.0, -4.2, 1.5]
         config["cm_num_samples"] = 1e6
         config["cm_max_depth"] = 15
         config["path_num_samples"] = 1e6
