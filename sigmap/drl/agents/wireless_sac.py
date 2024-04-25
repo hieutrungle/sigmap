@@ -277,14 +277,14 @@ class SoftActorCritic(nn.Module):
         # Actor receives a dict of {focal_pts, tx_position, rx_position}
         # and outputs a distribution of "delta_focal_pts"
         # "delta_focal_pts" shape: (batch_size, num_devices, 2, 3)
-        self.actor = Actor(observation_shapes, action_shape)
+        self.actor = Actor(observation_shapes, action_shape).to(ptu.DEVICE)
         self.actor_optimizer = make_actor_optimizer(self.actor.parameters())
         self.actor_lr_scheduler = make_actor_schedule(self.actor_optimizer)
 
         # Multiple Critics
         self.critics = nn.ModuleList(
             [
-                Critic(observation_shapes, action_shape)
+                Critic(observation_shapes, action_shape).to(ptu.DEVICE)
                 for _ in range(num_critic_networks)
             ]
         )
@@ -292,13 +292,13 @@ class SoftActorCritic(nn.Module):
         self.critics_lr_scheduler = make_critic_schedule(self.critics_optimizer)
         self.target_critics = nn.ModuleList(
             [
-                Critic(observation_shapes, action_shape)
+                Critic(observation_shapes, action_shape).to(ptu.DEVICE)
                 for _ in range(num_critic_networks)
             ]
         )
 
-        # self.observation_shape = observation_shape
-        # self.action_dim = action_dim
+        self.observation_shapes = observation_shapes
+        self.action_shape = action_shape
         self.discount = discount
         self.target_update_period = target_update_period
         self.target_critic_backup_type = target_critic_backup_type
@@ -315,44 +315,40 @@ class SoftActorCritic(nn.Module):
 
         self.update_target_critics()
 
-    def get_action(
-        self, observation: list[dict[Union[np.ndarray, list]]]
-    ) -> np.ndarray:
+    def get_action(self, observation: Observations) -> np.ndarray:
         """
-        Compute the action for a given observation.
+        Compute an action for a given observation.
         """
-        # TODO: adapt to observation type list[dict[Union[np.ndarray, list]]]
         with torch.no_grad():
-
             action_distribution: torch.distributions.Distribution = self.actor(
                 observation
             )
             action: torch.Tensor = action_distribution.sample()
 
-            assert action.shape == (1, self.action_dim), action.shape
+            assert action.shape == (1, *self.action_shape), action.shape
             return ptu.to_numpy(action).squeeze(0)
 
     def run_critics(
         self,
-        observations: list[dict[Union[np.ndarray, list]]],
-        actions: list[np.ndarray],
+        observations: Observations,
+        actions: np.ndarray,
     ) -> torch.Tensor:
         """
         Compute the (ensembled) Q-values for the given state-action pair.
         """
-        # TODO: adapt to observation type list[dict[Union[np.ndarray, list]]]
+        # TODO: adapt to observation type Observations
         q_values = [critic(observations, actions) for critic in self.critics]
         return torch.stack(q_values, dim=0)
 
     def run_target_critics(
         self,
-        observations: list[dict[Union[np.ndarray, list]]],
-        actions: list[np.ndarray],
+        observations: Observations,
+        actions: np.ndarray,
     ) -> torch.Tensor:
         """
         Compute the (ensembled) target Q-values for the given state-action pair.
         """
-        # TODO: adapt to observation type list[dict[Union[np.ndarray, list]]]
+        # TODO: adapt to observation type Observations
         q_values = [critic(observations, actions) for critic in self.target_critics]
         return torch.stack(q_values, dim=0)
 
@@ -427,16 +423,16 @@ class SoftActorCritic(nn.Module):
 
     def update_critics(
         self,
-        observations: list[dict[Union[np.ndarray, list]]],
-        actions: list[np.ndarray],
+        observations: Observations,
+        actions: np.ndarray,
         rewards: list[np.ndarray],
-        next_observations: list[dict[Union[np.ndarray, list]]],
+        next_observations: Observations,
         dones: list[np.ndarray],
     ):
         """
         Update the critic networks by computing target values and minimizing Bellman error.
         """
-        # TODO: adapt to observation type list[dict[Union[np.ndarray, list]]]
+        # TODO: adapt to observation type Observations
         (batch_size,) = rewards.shape
         # Compute target values
         # Important: we don't need gradients for target values!
@@ -504,13 +500,11 @@ class SoftActorCritic(nn.Module):
         entropy_est = -torch.mean(log_probs, dim=0)
         return entropy_est
 
-    def actor_loss_reinforce(
-        self, observations: list[dict[Union[np.ndarray, list]]]
-    ) -> torch.Tensor:
+    def actor_loss_reinforce(self, observations: Observations) -> torch.Tensor:
         """
         Compute the REINFORCE loss for the actor.
         """
-        # TODO: adapt to observation type list[dict[Union[np.ndarray, list]]]
+        # TODO: adapt to observation type Observations
         batch_size = observations.shape[0]
         # Compute the action distribution
         action_distribution: torch.distributions.Distribution = self.actor(observations)
@@ -544,13 +538,11 @@ class SoftActorCritic(nn.Module):
 
         return loss, torch.mean(self.entropy(action_distribution))
 
-    def actor_loss_reparametrize(
-        self, observations: list[dict[Union[np.ndarray, list]]]
-    ) -> torch.Tensor:
+    def actor_loss_reparametrize(self, observations: Observations) -> torch.Tensor:
         """
         Compute the reparametrize loss for the actor.
         """
-        # TODO: adapt to observation type list[dict[Union[np.ndarray, list]]]
+        # TODO: adapt to observation type Observations
         batch_size = len(observations)
         # action_distributions:
         # {
@@ -614,15 +606,13 @@ class SoftActorCritic(nn.Module):
         return loss, torch.mean(self.entropy(action_distributions))
         # return 0.0, 0.0
 
-    def _replicate_observations(
-        self, observations: list[dict[Union[np.ndarray, list]]], num_replicas: int
-    ):
+    def _replicate_observations(self, observations: Observations, num_replicas: int):
         """
         Replicate the observations to match the number of replicas.
         """
         return [copy.deepcopy(observations) for _ in range(num_replicas)]
 
-    def update_actor(self, obs: list[dict[Union[np.ndarray, list]]]):
+    def update_actor(self, obs: Observations):
         """
         Update the actor by one gradient step using either REPARAMETRIZE or REINFORCE.
         """
@@ -662,10 +652,10 @@ class SoftActorCritic(nn.Module):
 
     def update(
         self,
-        observations: list[dict[Union[np.ndarray, list]]],
-        actions: list[np.ndarray],
+        observations: Observations,
+        actions: np.ndarray,
         rewards: list[np.ndarray],
-        next_observations: list[dict[Union[np.ndarray, list]]],
+        next_observations: Observations,
         dones: list[np.ndarray],
         step: int,
     ):

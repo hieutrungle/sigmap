@@ -9,8 +9,9 @@ gpu_num = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-from sigmap.drl.agents.soft_actor_critic import SoftActorCritic
+from sigmap.drl.agents.wireless_sac import SoftActorCritic
 from sigmap.drl.infrastructure.replay_buffer import WirelessReplayBuffer
+from sigmap.drl.infrastructure.data_types import Observations
 
 # import sigmap.drl.env_configs
 
@@ -102,6 +103,7 @@ def run_training_loop(
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
 
+        action = agent.get_action(Observations(**ptu.add_batch_dimension(observation)))
         # accumulate data in replay buffer
         if step < drl_config.random_steps:
             action = env.action_space.sample()
