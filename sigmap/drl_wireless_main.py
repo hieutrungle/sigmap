@@ -24,10 +24,9 @@ import torch
 from sigmap.drl.infrastructure import pytorch_utils as ptu
 import tqdm
 
-# from sigmap.drl.infrastructure import utils
 from sigmap.drl.infrastructure.logger import TensorboardLogger
 
-from utils import scripting_utils, utils
+from utils import scripting_utils, utils, timer
 
 import argparse
 from sigmap.drl.envs import register_envs
@@ -52,16 +51,12 @@ def run_training_loop(
         utils.log_config(drl_config)
 
     env = drl_config.make_env()
-    eval_env = drl_config.make_env()
+    # eval_env = drl_config.make_env()
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
     discrete = isinstance(env.action_space, gym.spaces.Discrete)
     assert (
         not discrete
     ), "Our wireless DRL implementation only supports continuous action spaces."
-
-    ob_shape = env.observation_space["device_states"].shape
-    ac_shape = env.action_space.shape
-    ac_dim = np.prod(ac_shape)
 
     # simulation timestep, will be used for video saving
     if "model" in dir(env):
@@ -69,10 +64,28 @@ def run_training_loop(
     else:
         fps = env.env.metadata["render_fps"]
 
-    # initialize agent
+    # ob_shape = env.observation_space["focal_pts"].shape
+    # ac_shape = env.action_space.shape
+    # ac_dim = np.prod(ac_shape)
+
+    # # initialize agent
+    # agent = SoftActorCritic(
+    #     ob_shape,
+    #     ac_dim,
+    #     **drl_config.agent_kwargs,
+    # )
+
+    ob_space = env.observation_space
+    ob_shapes = []
+    for key in ob_space.keys():
+        ob_shapes.append(ob_space[key].shape)
+    ob_shapes = tuple(ob_shapes)
+    ac_space = env.action_space
+    ac_shape = ac_space.shape
+    # TODO: implement SAC with ob_space and ac_dim
     agent = SoftActorCritic(
-        ob_shape,
-        ac_dim,
+        ob_shapes,
+        ac_shape,
         **drl_config.agent_kwargs,
     )
 
@@ -85,7 +98,7 @@ def run_training_loop(
         drl_config.replay_buffer_capacity, buffer_saved_dir
     )
 
-    observation, info = env.reset()
+    (observation, info) = env.reset()
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
 
@@ -93,11 +106,17 @@ def run_training_loop(
         if step < drl_config.random_steps:
             action = env.action_space.sample()
         else:
+            # TODO: get correct action from agent
             action = agent.get_action(observation)
 
+        # with timer.Timer(
+        #     text="Elapsed env step time: {:0.4f} seconds\n", logger_fn=utils.logger.log
+        # ):
         next_observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
-        done = done or info.get("episode", {}).get("l", 0) >= ep_len
+        done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
+        reward = np.array(reward, dtype=np.float32)
+        done = np.array(done, dtype=np.float32)
         replay_buffer.insert(
             observation=observation,
             action=action,
@@ -114,15 +133,12 @@ def run_training_loop(
 
         # train agent
         if step > drl_config.training_starts:
-            batches = replay_buffer.sample(drl_config.batch_size)
-            obs, actions, rewards, next_obs, dones = [], [], [], [], []
-            for batch in batches:
-                obs.append(batch["observation"])
-                actions.append(batch["action"])
-                rewards.append(batch["reward"])
-                next_obs.append(batch["next_observation"])
-                dones.append(batch["done"])
-            update_info = agent.update(obs, action, reward, next_obs, done)
+            # TODO: fix batch sampling
+            batch = replay_buffer.sample(drl_config.batch_size)
+            obs, actions, rewards, next_obs, dones = batch
+
+            # TODO: implement update method in SAC
+            update_info = agent.update(obs, actions, rewards, next_obs, dones)
 
             # logging
             update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
