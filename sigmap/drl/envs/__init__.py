@@ -22,3 +22,8 @@ def register_envs():
         entry_point="sigmap.drl.envs.wireless:WirelessEnv",
         max_episode_steps=1000,
     )
+    register(
+        id="wireless-sigmap-v2",
+        entry_point="sigmap.drl.envs.wireless:WirelessEnvV2",
+        max_episode_steps=1000,
+    )
