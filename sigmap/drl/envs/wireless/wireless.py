@@ -8,7 +8,7 @@ from typing import Tuple
 import numpy as np
 from gymnasium import Env, spaces
 from sigmap.utils import utils
-from sigmap.drl.infrastructure.data_type import Observation
+from sigmap.drl.infrastructure.data_types import Observation
 import sigmap
 
 
