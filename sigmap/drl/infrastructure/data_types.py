@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Union
-
+import sigmap.drl.infrastructure.pytorch_utils as ptu
+import torch
 
 # class Observation:
 #     def __init__(
@@ -270,6 +271,31 @@ class Observations:
         self.focal_pts = np.concatenate([self.focal_pts, focal_pts], axis=0)
         self.tx_positions = np.concatenate([self.tx_positions, tx_positions], axis=0)
         self.rx_positions = np.concatenate([self.rx_positions, rx_positions], axis=0)
+
+    def to_numpy(self):
+        self.focal_pts = ptu.to_numpy(self.focal_pts)
+        self.tx_positions = ptu.to_numpy(self.tx_positions)
+        self.rx_positions = ptu.to_numpy(self.rx_positions)
+
+    def from_numpy(self):
+        self.focal_pts = ptu.from_numpy(self.focal_pts)
+        self.tx_positions = ptu.from_numpy(self.tx_positions)
+        self.rx_positions = ptu.from_numpy(self.rx_positions)
+
+    def to(self, device):
+        if not isinstance(device, str):
+            raise ValueError("device should be a string")
+        if device not in ["cpu", "cuda"]:
+            raise ValueError("device should be 'cpu' or 'cuda'")
+        if not isinstance(self.focal_pts, torch.Tensor):
+            raise ValueError("focal_pts should be a torch.Tensor")
+        if not isinstance(self.tx_positions, torch.Tensor):
+            raise ValueError("tx_positions should be a torch.Tensor")
+        if not isinstance(self.rx_positions, torch.Tensor):
+            raise ValueError("rx_positions should be a torch.Tensor")
+        self.focal_pts = self.focal_pts.to(device)
+        self.tx_positions = self.tx_positions.to(device)
+        self.rx_positions = self.rx_positions.to(device)
 
     # def __str__(self):
     #     return (
