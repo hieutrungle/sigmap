@@ -252,7 +252,7 @@ class Observations:
         self.rx_positions[idxs] = observations.rx_positions
 
     def __len__(self):
-        return self.size
+        return self.focal_pts.shape[0]
 
     def append(
         self, focal_pts: np.ndarray, tx_positions: np.ndarray, rx_positions: np.ndarray
