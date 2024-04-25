@@ -140,3 +140,10 @@ def to_numpy(tensor: Union[torch.Tensor, dict]):
         return {k: to_numpy(v) for k, v in tensor.items()}
     else:
         return tensor.to("cpu").detach().numpy()
+
+
+def add_batch_dimension(data: Union[np.ndarray, dict]):
+    if isinstance(data, dict):
+        return {k: add_batch_dimension(v) for k, v in data.items()}
+    else:
+        return data[None, ...]
