@@ -238,13 +238,16 @@ class WirelessReplayBuffer:
 
     def sample(self, batch_size: int) -> list[DataBatch]:
 
-        rand_indices = (
+        rand_indices = list(
             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
         )
-        batches = []
-        for rand_idx in rand_indices:
-            batches.append(self.batches[rand_idx])
-        return batches
+        return (
+            self.observations[rand_indices],
+            self.actions[rand_indices],
+            self.rewards[rand_indices],
+            self.next_observations[rand_indices],
+            self.dones[rand_indices],
+        )
 
     def __len__(self):
         return self.size_counter
@@ -274,7 +277,7 @@ class WirelessReplayBuffer:
 
         if self.observations is None:
             self.observations = Observations(
-                device_state=observation["device_state"][None],
+                focal_pts=observation["focal_pts"][None],
                 tx_position=observation["tx_position"][None],
                 rx_position=observation["rx_position"][None],
                 size=self.max_size,
@@ -282,7 +285,7 @@ class WirelessReplayBuffer:
             self.actions = np.empty((self.max_size, *action.shape), dtype=action.dtype)
             self.rewards = np.empty((self.max_size, *reward.shape), dtype=reward.dtype)
             self.next_observations = Observations(
-                device_state=next_observation["device_state"][None],
+                focal_pts=next_observation["focal_pts"][None],
                 tx_position=next_observation["tx_position"][None],
                 rx_position=next_observation["rx_position"][None],
                 size=self.max_size,
@@ -290,12 +293,12 @@ class WirelessReplayBuffer:
             self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
 
         observations = Observations(
-            device_state=observation["device_state"][None],
+            focal_pts=observation["focal_pts"][None],
             tx_position=observation["tx_position"][None],
             rx_position=observation["rx_position"][None],
         )
         next_observations = Observations(
-            device_state=next_observation["device_state"][None],
+            focal_pts=next_observation["focal_pts"][None],
             tx_position=next_observation["tx_position"][None],
             rx_position=next_observation["rx_position"][None],
         )
