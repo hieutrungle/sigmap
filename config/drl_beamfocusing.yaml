@@ -4,14 +4,14 @@ base_config: wireless
 num_critic_networks: 2
 target_critic_backup_type: min
 exp_name: clipq
-env_name: wireless-sigmap-v0
+env_name: wireless-sigmap-v2
 
-total_steps: 100000
-random_steps: 5000
-training_starts: 3
+total_steps: 10000
+random_steps: 10
+training_starts: 7
 
-batch_size: 2
-replay_buffer_capacity: 1000000
+batch_size: 4
+replay_buffer_capacity: 50000
 
 discount: 0.99
 use_soft_target_update: true
