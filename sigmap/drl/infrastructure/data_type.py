@@ -172,24 +172,24 @@ class Observations:
     Class to store a batch of observations
 
     Args:
-        device_state (np.ndarray): [batch_size, num_devices, num_tiles, num_features]
+        device_state (np.ndarray): [batch_size, num_devices, 2, 3]
         tx_position (np.ndarray): [batch_size, num_tx, 3]
         rx_position (np.ndarray): [batch_size, num_rx, 3]
 
     Returns:
-        Observations: [batch_size, num_devices, num_tiles, num_features], [batch_size, num_tx, 3], [batch_size, num_rx, 3]
+        Observations: [batch_size, num_devices, 2, 3], [batch_size, num_tx, 3], [batch_size, num_rx, 3]
     """
 
     def __init__(
         self,
-        device_state: np.ndarray,
+        focal_pts: np.ndarray,
         tx_position: np.ndarray,
         rx_position: np.ndarray,
         size: int = None,
     ):
         """
         Args:
-            device_state (np.ndarray): [batch_size, num_devices, num_tiles, num_features]
+            focal_pts (np.ndarray): [batch_size, num_devices, 2, 3]
             tx_position (np.ndarray): [batch_size, num_tx, 3]
             rx_position (np.ndarray): [batch_size, num_rx, 3]
             size (int): Number of observations
@@ -199,8 +199,8 @@ class Observations:
         """
 
         assert (
-            len(device_state.shape) == 4
-        ), f"device_state should have 4 dimensions: [batch_size, num_devices, num_tiles, num_features]. Got {device_state.shape}"
+            len(focal_pts.shape) == 4
+        ), f"focal_pts should have 4 dimensions: [batch_size, num_devices, 2, 3]. Got {focal_pts.shape}"
         assert (
             len(tx_position.shape) == 3
         ), f"tx_position should have 3 dimensions: [batch_size, num_tx, 3]. Got {tx_position.shape}"
@@ -208,19 +208,19 @@ class Observations:
             len(rx_position.shape) == 3
         ), f"rx_position should have 3 dimensions: [batch_size, num_rx, 3]. Got {rx_position.shape}"
 
-        self.device_state_shape = device_state.shape[1:]
+        self.focal_pts_shape = focal_pts.shape[1:]
         self.tx_position_shape = tx_position.shape[1:]
         self.rx_position_shape = rx_position.shape[1:]
 
         if size is not None:
             self._initialize(size)
         else:
-            self.device_state = device_state
+            self.focal_pts = focal_pts
             self.tx_position = tx_position
             self.rx_position = rx_position
 
     def _initialize(self, size: int):
-        self.device_state = np.zeros((size, *self.device_state_shape))
+        self.focal_pts = np.zeros((size, *self.focal_pts_shape))
         self.tx_position = np.zeros((size, *self.tx_position_shape))
         self.rx_position = np.zeros((size, *self.rx_position_shape))
 
@@ -228,22 +228,26 @@ class Observations:
         if isinstance(idxs, int):
             idxs = [idxs]
         if not isinstance(idxs, list):
-            raise ValueError("idxs should be a list of int or int")
-        device_state = self.device_state[idxs]
+            raise ValueError(
+                f"idxs should be of type [int ,list[int]], got {type(idxs)}"
+            )
+        focal_pts = self.focal_pts[idxs]
         tx_position = self.tx_position[idxs]
         rx_position = self.rx_position[idxs]
-        return Observations(device_state, tx_position, rx_position)
+        return Observations(focal_pts, tx_position, rx_position)
 
     def __setitem__(self, idxs: Union[int, list], observations):
         if isinstance(idxs, int):
             idxs = [idxs]
         if not isinstance(idxs, list):
-            raise ValueError(f"idxs should be a list of int or int. Got {type(idxs)}")
+            raise ValueError(
+                f"idxs should be of type [int ,list[int]], got {type(idxs)}"
+            )
         if not isinstance(observations, Observations):
             raise ValueError(
                 f"value should be an instance of Observations. Got {type(observations)}"
             )
-        self.device_state[idxs] = observations.device_state
+        self.focal_pts[idxs] = observations.focal_pts
         self.tx_position[idxs] = observations.tx_position
         self.rx_position[idxs] = observations.rx_position
 
@@ -251,11 +255,11 @@ class Observations:
         return self.size
 
     def append(
-        self, device_state: np.ndarray, tx_position: np.ndarray, rx_position: np.ndarray
+        self, focal_pts: np.ndarray, tx_position: np.ndarray, rx_position: np.ndarray
     ):
-        assert len(device_state.shape) == len(
-            self.device_state.shape
-        ), f"Invalid shape. Expected [batch_size, {self.device_state.shape[1:]}]. Got {device_state.shape}"
+        assert len(focal_pts.shape) == len(
+            self.focal_pts.shape
+        ), f"Invalid shape. Expected [batch_size, {self.focal_pts.shape[1:]}]. Got {focal_pts.shape}"
         assert len(tx_position.shape) == len(
             self.tx_position.shape
         ), f"Invalid shape. Expected [batch_size, {self.tx_position.shape[1:]}]. Got {tx_position.shape}"
@@ -263,7 +267,7 @@ class Observations:
             self.rx_position.shape
         ), f"Invalid shape. Expected [batch_size, {self.rx_position.shape[1:]}]. Got {rx_position.shape}"
 
-        self.device_state = np.concatenate([self.device_state, device_state], axis=0)
+        self.focal_pts = np.concatenate([self.focal_pts, focal_pts], axis=0)
         self.tx_position = np.concatenate([self.tx_position, tx_position], axis=0)
         self.rx_position = np.concatenate([self.rx_position, rx_position], axis=0)
 
