@@ -251,3 +251,12 @@ def read_n_to_last_line(filename, n=1) -> str:
         n_to_last_line = f.readline().decode()
 
     return n_to_last_line
+
+
+# Conversion
+def linear2dB(x: float) -> float:
+    return float(10 * np.log10(x))
+
+
+def dB2linear(x: float) -> float:
+    return float(10 ** (x / 10))
