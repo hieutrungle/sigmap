@@ -30,7 +30,7 @@ def make_tanh_transformed(
             base_distribution=D.Normal(mean, std),
             transforms=[D.TanhTransform(cache_size=1)],
         ),
-        reinterpreted_batch_ndims=1,
+        reinterpreted_batch_ndims=3,
     )
 
 
