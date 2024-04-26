@@ -267,8 +267,8 @@ class WirelessEnvV2(Env):
         sig_cmap.render_to_file(coverage_map)
         path_gain = sig_cmap.get_path_gain(coverage_map)
         path_gain = float(path_gain)
-
-        return path_gain
+        path_gain_dB = utils.linear2dB(path_gain)
+        return path_gain_dB
 
     def _modify_config_file(self, config_file, **kwargs):
         config_kwargs = utils.load_yaml_file(config_file)
