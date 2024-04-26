@@ -230,26 +230,36 @@ class WirelessReplayBuffer:
         self.name = name
         self.prefix_idx = prefix_idx
 
-        self.observations: Observations = None
+        self.observations: dict = None
         self.actions: np.ndarray = None
         self.rewards: np.ndarray = None
-        self.next_observations: Observations = None
+        self.next_observations: dict = None
         self.dones: np.ndarray = None
 
     def sample(
         self, batch_size: int
-    ) -> Tuple[Observations, np.ndarray, np.ndarray, Observations, np.ndarray]:
+    ) -> Tuple[dict, np.ndarray, np.ndarray, dict, np.ndarray]:
 
         rand_indices = list(
             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
         )
-        return (
-            self.observations[rand_indices],
-            self.actions[rand_indices],
-            self.rewards[rand_indices],
-            self.next_observations[rand_indices],
-            self.dones[rand_indices],
-        )
+        observations = {
+            "focal_pts": self.observations["focal_pts"][rand_indices],
+            "tx_positions": self.observations["tx_positions"][rand_indices],
+            "rx_positions": self.observations["rx_positions"][rand_indices],
+        }
+        next_observations = {
+            "focal_pts": self.next_observations["focal_pts"][rand_indices],
+            "tx_positions": self.next_observations["tx_positions"][rand_indices],
+            "rx_positions": self.next_observations["rx_positions"][rand_indices],
+        }
+        return {
+            "observations": observations,
+            "actions": self.actions[rand_indices],
+            "rewards": self.rewards[rand_indices],
+            "next_observations": next_observations,
+            "dones": self.dones[rand_indices],
+        }
 
     def __len__(self):
         return self.size_counter
@@ -278,37 +288,43 @@ class WirelessReplayBuffer:
         """
 
         if self.observations is None:
-            self.observations = Observations(
-                focal_pts=observation["focal_pts"][None],
-                tx_positions=observation["tx_positions"][None],
-                rx_positions=observation["rx_positions"][None],
-                size=self.max_size,
-            )
+            self.observations = {
+                "focal_pts": np.empty((self.max_size, *observation["focal_pts"].shape)),
+                "tx_positions": np.empty(
+                    (self.max_size, *observation["tx_positions"].shape)
+                ),
+                "rx_positions": np.empty(
+                    (self.max_size, *observation["rx_positions"].shape)
+                ),
+            }
             self.actions = np.empty((self.max_size, *action.shape), dtype=action.dtype)
             self.rewards = np.empty((self.max_size, *reward.shape), dtype=reward.dtype)
-            self.next_observations = Observations(
-                focal_pts=next_observation["focal_pts"][None],
-                tx_positions=next_observation["tx_positions"][None],
-                rx_positions=next_observation["rx_positions"][None],
-                size=self.max_size,
-            )
+            self.next_observations = {
+                "focal_pts": np.empty(
+                    (self.max_size, *next_observation["focal_pts"].shape)
+                ),
+                "tx_positions": np.empty(
+                    (self.max_size, *next_observation["tx_positions"].shape)
+                ),
+                "rx_positions": np.empty(
+                    (self.max_size, *next_observation["rx_positions"].shape)
+                ),
+            }
             self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
 
-        observations = Observations(
-            focal_pts=observation["focal_pts"][None],
-            tx_positions=observation["tx_positions"][None],
-            rx_positions=observation["rx_positions"][None],
-        )
-        next_observations = Observations(
-            focal_pts=next_observation["focal_pts"][None],
-            tx_positions=next_observation["tx_positions"][None],
-            rx_positions=next_observation["rx_positions"][None],
-        )
         cur_idx = self.size_counter % self.max_size
-        self.observations[cur_idx] = observations
+        self.observations["focal_pts"][cur_idx] = observation["focal_pts"]
+        self.observations["tx_positions"][cur_idx] = observation["tx_positions"]
+        self.observations["rx_positions"][cur_idx] = observation["rx_positions"]
         self.actions[cur_idx] = action
         self.rewards[cur_idx] = reward
-        self.next_observations[cur_idx] = next_observations
+        self.next_observations["focal_pts"][cur_idx] = next_observation["focal_pts"]
+        self.next_observations["tx_positions"][cur_idx] = next_observation[
+            "tx_positions"
+        ]
+        self.next_observations["rx_positions"][cur_idx] = next_observation[
+            "rx_positions"
+        ]
         self.dones[cur_idx] = done
 
         # Save the batch to a file
@@ -344,65 +360,200 @@ class WirelessReplayBuffer:
             json.dump(batch, f, cls=utils.NpEncoder)
             f.write("\n")
 
-    # def batched_insert(
-    #     self,
-    #     /,
-    #     observations: list[dict[Union[np.ndarray, list]]],
-    #     actions: list[np.ndarray],
-    #     rewards: list[np.ndarray],
-    #     next_observations: list[dict[Union[np.ndarray, list]]],
-    #     dones: list[np.ndarray],
-    #     is_saved: bool = True,
-    # ) -> None:
-    #     """
-    #     Insert a batch of transitions into the replay buffer.
-    #     """
-    #     batches = DataBatches(
-    #         observations=observations,
-    #         actions=actions,
-    #         rewards=rewards,
-    #         next_observations=next_observations,
-    #         dones=dones,
-    #     )
 
-    #     # If the replay buffer is empty, fill it with the first batch
-    #     # This prevent allocating memory for future batches
-    #     if len(self.batches) == 0:
-    #         self.batches = [batches[0] for _ in range(self.max_size)]
+# class WirelessReplayBuffer:
+#     def __init__(
+#         self,
+#         buffer_size: int = 100000,
+#         saved_dir="",
+#         name="wireless_replay_buffer",
+#         prefix_idx=0,
+#     ):
+#         """
+#         A replay buffer for wireless environments.
 
-    #     indices = (
-    #         np.arange(self.size_counter, self.size_counter + len(actions))
-    #         % self.max_size
-    #     )
-    #     for i, target_idx in enumerate(indices):
-    #         self.batches[target_idx] = batches[i]
+#         It is an empty DataBaches object with the ability to insert data.
+#         """
+#         super().__init__()
+#         self.max_size = buffer_size
+#         self.size_counter = 0
+#         self.saved_dir = saved_dir
+#         self.name = name
+#         self.prefix_idx = prefix_idx
 
-    #     if is_saved:
-    #         saved_path = os.path.join(
-    #             self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
-    #         )
-    #         batches.save(saved_path)
+#         self.observations: Observations = None
+#         self.actions: np.ndarray = None
+#         self.rewards: np.ndarray = None
+#         self.next_observations: Observations = None
+#         self.dones: np.ndarray = None
 
-    #     # Increment index for saving to a new file
-    #     self.size_counter += len(actions)
-    #     if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
-    #         self.prefix_idx += 1
+#     def sample(
+#         self, batch_size: int
+#     ) -> Tuple[Observations, np.ndarray, np.ndarray, Observations, np.ndarray]:
 
-    # def load_replay_buffer(self):
-    #     filepaths = glob.glob(os.path.join(self.saved_dir, f"{self.name}_*.txt"))
-    #     for file in filepaths:
-    #         batches = DataBatches()
-    #         batches.load(file)
+#         rand_indices = list(
+#             np.random.randint(0, self.size_counter, size=(batch_size,)) % self.max_size
+#         )
+#         return (
+#             self.observations[rand_indices],
+#             self.actions[rand_indices],
+#             self.rewards[rand_indices],
+#             self.next_observations[rand_indices],
+#             self.dones[rand_indices],
+#         )
 
-    #         for batch in batches:
-    #             self.insert(
-    #                 observation=batch["observation"],
-    #                 action=batch["action"],
-    #                 reward=batch["reward"],
-    #                 next_observation=batch["next_observation"],
-    #                 done=batch["done"],
-    #                 is_saved=False,
-    #             )
+#     def __len__(self):
+#         return self.size_counter
+
+#     def insert(
+#         self,
+#         /,
+#         observation: dict,
+#         action: np.ndarray,
+#         reward: np.ndarray,
+#         next_observation: dict,
+#         done: np.ndarray,
+#         is_saved: bool = True,
+#     ):
+#         """
+#         Insert a single transition into the replay buffer.
+
+#         Use like:
+#             replay_buffer.insert(
+#                 observation=observation,
+#                 action=action,
+#                 reward=reward,
+#                 next_observation=next_observation,
+#                 done=done,
+#             )
+#         """
+
+#         if self.observations is None:
+#             self.observations = Observations(
+#                 focal_pts=observation["focal_pts"][None],
+#                 tx_positions=observation["tx_positions"][None],
+#                 rx_positions=observation["rx_positions"][None],
+#                 size=self.max_size,
+#             )
+#             self.actions = np.empty((self.max_size, *action.shape), dtype=action.dtype)
+#             self.rewards = np.empty((self.max_size, *reward.shape), dtype=reward.dtype)
+#             self.next_observations = Observations(
+#                 focal_pts=next_observation["focal_pts"][None],
+#                 tx_positions=next_observation["tx_positions"][None],
+#                 rx_positions=next_observation["rx_positions"][None],
+#                 size=self.max_size,
+#             )
+#             self.dones = np.empty((self.max_size, *done.shape), dtype=done.dtype)
+
+#         observations = Observations(
+#             focal_pts=observation["focal_pts"][None],
+#             tx_positions=observation["tx_positions"][None],
+#             rx_positions=observation["rx_positions"][None],
+#         )
+#         next_observations = Observations(
+#             focal_pts=next_observation["focal_pts"][None],
+#             tx_positions=next_observation["tx_positions"][None],
+#             rx_positions=next_observation["rx_positions"][None],
+#         )
+#         cur_idx = self.size_counter % self.max_size
+#         self.observations[cur_idx] = observations
+#         self.actions[cur_idx] = action
+#         self.rewards[cur_idx] = reward
+#         self.next_observations[cur_idx] = next_observations
+#         self.dones[cur_idx] = done
+
+#         # Save the batch to a file
+#         if is_saved:
+#             saved_path = os.path.join(
+#                 self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
+#             )
+#             self.save_data_to_file(
+#                 saved_path, observation, action, reward, next_observation, done
+#             )
+
+#         self.size_counter += 1
+#         if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
+#             self.prefix_idx += 1
+
+#     def save_data_to_file(
+#         self,
+#         saved_path: str,
+#         observation: dict,
+#         action: np.ndarray,
+#         reward: np.ndarray,
+#         next_observation: dict,
+#         done: np.ndarray,
+#     ) -> None:
+#         batch = {
+#             "observation": observation,
+#             "action": action,
+#             "reward": reward,
+#             "next_observation": next_observation,
+#             "done": done,
+#         }
+#         with open(saved_path, "a") as f:
+#             json.dump(batch, f, cls=utils.NpEncoder)
+#             f.write("\n")
+
+# def batched_insert(
+#     self,
+#     /,
+#     observations: list[dict[Union[np.ndarray, list]]],
+#     actions: list[np.ndarray],
+#     rewards: list[np.ndarray],
+#     next_observations: list[dict[Union[np.ndarray, list]]],
+#     dones: list[np.ndarray],
+#     is_saved: bool = True,
+# ) -> None:
+#     """
+#     Insert a batch of transitions into the replay buffer.
+#     """
+#     batches = DataBatches(
+#         observations=observations,
+#         actions=actions,
+#         rewards=rewards,
+#         next_observations=next_observations,
+#         dones=dones,
+#     )
+
+#     # If the replay buffer is empty, fill it with the first batch
+#     # This prevent allocating memory for future batches
+#     if len(self.batches) == 0:
+#         self.batches = [batches[0] for _ in range(self.max_size)]
+
+#     indices = (
+#         np.arange(self.size_counter, self.size_counter + len(actions))
+#         % self.max_size
+#     )
+#     for i, target_idx in enumerate(indices):
+#         self.batches[target_idx] = batches[i]
+
+#     if is_saved:
+#         saved_path = os.path.join(
+#             self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
+#         )
+#         batches.save(saved_path)
+
+#     # Increment index for saving to a new file
+#     self.size_counter += len(actions)
+#     if self.size_counter > (self.max_size * (self.prefix_idx + 1)):
+#         self.prefix_idx += 1
+
+# def load_replay_buffer(self):
+#     filepaths = glob.glob(os.path.join(self.saved_dir, f"{self.name}_*.txt"))
+#     for file in filepaths:
+#         batches = DataBatches()
+#         batches.load(file)
+
+#         for batch in batches:
+#             self.insert(
+#                 observation=batch["observation"],
+#                 action=batch["action"],
+#                 reward=batch["reward"],
+#                 next_observation=batch["next_observation"],
+#                 done=batch["done"],
+#                 is_saved=False,
+#             )
 
 
 # class WirelessReplayBuffer(DataBatches):
