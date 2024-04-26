@@ -100,18 +100,24 @@ class Actor(nn.Module):
         #         )
         #     )
 
-    def forward(self, observations: Observations) -> torch.distributions.Distribution:
+    def forward(self, observations: dict) -> torch.distributions.Distribution:
 
-        focal_pts = observations.focal_pts
-        tx_positions = observations.tx_positions
-        rx_positions = observations.rx_positions
+        focal_pts: torch.Tensor = observations["focal_pts"]
+        tx_positions: torch.Tensor = observations["tx_positions"]
+        rx_positions: torch.Tensor = observations["rx_positions"]
 
         batch_size = focal_pts.shape[0]
 
         # Flatten the inputs
-        focal_pts = focal_pts.view(batch_size, -1)
-        tx_positions = tx_positions.view(batch_size, -1)
-        rx_positions = rx_positions.view(batch_size, -1)
+        focal_pts = focal_pts.view(
+            *focal_pts.shape[:-3], torch.prod(focal_pts.shape[-3:])
+        )
+        tx_positions = tx_positions.view(
+            *tx_positions.shape[:-3], torch.prod(tx_positions.shape[-3:])
+        )
+        rx_positions = rx_positions.view(
+            *rx_positions.shape[:-3], torch.prod(rx_positions.shape[-3:])
+        )
 
         focal = self.upper_block(focal_pts)
         positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=1))
@@ -125,8 +131,8 @@ class Actor(nn.Module):
         std = torch.nn.functional.softplus(std) + 1e-2
 
         # Convert to the correct shape
-        mean = mean.view((batch_size, *self.action_shape))
-        std = std.view((batch_size, *self.action_shape))
+        mean = mean.view((*mean.shape[:-3], *self.action_shape))
+        std = std.view((*std.shape[:-3], *self.action_shape))
 
         # if self.state_dependent_std:
         #     mean, std = torch.chunk(means, 2, dim=-1)
@@ -199,20 +205,26 @@ class Critic(nn.Module):
 
     def forward(
         self,
-        observations: Observations,
-        actions: np.ndarray,
+        observations: dict,
+        actions: torch.Tensor,
     ):
-        focal_pts = observations.focal_pts
-        tx_positions = observations.tx_positions
-        rx_positions = observations.rx_positions
+        focal_pts: torch.Tensor = observations["focal_pts"]
+        tx_positions: torch.Tensor = observations["tx_positions"]
+        rx_positions: torch.Tensor = observations["rx_positions"]
 
         batch_size = focal_pts.shape[0]
 
         # Flatten the inputs
-        focal_pts = focal_pts.view(batch_size, -1)
-        tx_positions = tx_positions.view(batch_size, -1)
-        rx_positions = rx_positions.view(batch_size, -1)
-        actions = actions.view(batch_size, -1)
+        focal_pts = focal_pts.view(
+            *focal_pts.shape[:-3], torch.prod(focal_pts.shape[-3:])
+        )
+        tx_positions = tx_positions.view(
+            *tx_positions.shape[:-3], torch.prod(tx_positions.shape[-3:])
+        )
+        rx_positions = rx_positions.view(
+            *rx_positions.shape[:-3], torch.prod(rx_positions.shape[-3:])
+        )
+        actions = actions.view(*actions.shape[:-3], torch.prod(actions.shape[-3:]))
 
         mixed = torch.cat([focal_pts, actions], dim=1)
         mixed = self.upper_block(mixed)
@@ -220,7 +232,7 @@ class Critic(nn.Module):
         combined = torch.cat([mixed, positions], dim=1)
         q_values = self.lower_block(combined)
 
-        return q_values
+        return q_values.squeeze(-1)
 
 
 class SoftActorCritic(nn.Module):
@@ -315,40 +327,45 @@ class SoftActorCritic(nn.Module):
 
         self.update_target_critics()
 
-    def get_action(self, observation: Observations) -> np.ndarray:
+    def get_action(self, observation: dict[np.ndarray]) -> np.ndarray:
         """
         Compute an action for a given observation.
         """
+        observation = ptu.add_batch_dimension(observation)
+        observation = ptu.from_numpy(observation)
         with torch.no_grad():
             action_distribution: torch.distributions.Distribution = self.actor(
                 observation
             )
             action: torch.Tensor = action_distribution.sample()
 
-            assert action.shape == (1, *self.action_shape), action.shape
-            return ptu.to_numpy(action).squeeze(0)
+        assert action.shape == (1, *self.action_shape), action.shape
+        action: np.ndarray = ptu.to_numpy(action)
+        return action.squeeze(0)
 
     def run_critics(
         self,
-        observations: Observations,
-        actions: np.ndarray,
+        observations: dict[torch.Tensor],
+        actions: torch.Tensor,
     ) -> torch.Tensor:
         """
         Compute the (ensembled) Q-values for the given state-action pair.
+
+        q_values shape: (num_critics, batch_size)
         """
-        # TODO: adapt to observation type Observations
         q_values = [critic(observations, actions) for critic in self.critics]
         return torch.stack(q_values, dim=0)
 
     def run_target_critics(
         self,
-        observations: Observations,
-        actions: np.ndarray,
+        observations: dict[torch.Tensor],
+        actions: torch.Tensor,
     ) -> torch.Tensor:
         """
         Compute the (ensembled) target Q-values for the given state-action pair.
+
+        q_values shape: (num_critics, batch_size)
         """
-        # TODO: adapt to observation type Observations
         q_values = [critic(observations, actions) for critic in self.target_critics]
         return torch.stack(q_values, dim=0)
 
@@ -423,16 +440,15 @@ class SoftActorCritic(nn.Module):
 
     def update_critics(
         self,
-        observations: Observations,
-        actions: np.ndarray,
-        rewards: list[np.ndarray],
-        next_observations: Observations,
-        dones: list[np.ndarray],
+        observations: dict[torch.Tensor],
+        actions: torch.Tensor,
+        rewards: torch.Tensor,
+        next_observations: dict[torch.Tensor],
+        dones: torch.Tensor,
     ):
         """
         Update the critic networks by computing target values and minimizing Bellman error.
         """
-        # TODO: adapt to observation type Observations
         (batch_size,) = rewards.shape
         # Compute target values
         # Important: we don't need gradients for target values!
@@ -466,8 +482,16 @@ class SoftActorCritic(nn.Module):
                 next_qs += self.temperature * next_actions_entropy
 
             # Compute target Q-values
-            target_values: torch.Tensor = rewards[None] + self.discount * next_qs * (
-                1 - 1.0 * dones[None]
+            rewards = (
+                rewards[None]
+                .expand((self.num_critic_networks, batch_size))
+                .contiguous()
+            )
+            dones = (
+                dones[None].expand((self.num_critic_networks, batch_size)).contiguous()
+            )
+            target_values: torch.Tensor = rewards + self.discount * next_qs * (
+                1 - 1.0 * dones
             )
             assert target_values.shape == (
                 self.num_critic_networks,
@@ -500,11 +524,10 @@ class SoftActorCritic(nn.Module):
         entropy_est = -torch.mean(log_probs, dim=0)
         return entropy_est
 
-    def actor_loss_reinforce(self, observations: Observations) -> torch.Tensor:
+    def actor_loss_reinforce(self, observations: dict[torch.Tensor]) -> torch.Tensor:
         """
         Compute the REINFORCE loss for the actor.
         """
-        # TODO: adapt to observation type Observations
         batch_size = observations.shape[0]
         # Compute the action distribution
         action_distribution: torch.distributions.Distribution = self.actor(observations)
@@ -538,61 +561,18 @@ class SoftActorCritic(nn.Module):
 
         return loss, torch.mean(self.entropy(action_distribution))
 
-    def actor_loss_reparametrize(self, observations: Observations) -> torch.Tensor:
+    def actor_loss_reparametrize(
+        self, observations: dict[torch.Tensor]
+    ) -> torch.Tensor:
         """
         Compute the reparametrize loss for the actor.
         """
-        # TODO: adapt to observation type Observations
         batch_size = len(observations)
-        # action_distributions:
-        # {
-        #   "device_states": torch.distributions.Distribution,
-        #   "tx_position": torch.distributions.Distribution,
-        #   "rx_position": torch.distributions.Distribution
-        # }
-        action_distributions: dict[str, torch.distributions.Distribution] = self.actor(
-            observations
-        )
-        delta_device_states_distribution = action_distributions["device_states"]
-        delta_tx_position_distribution = action_distributions["tx_position"]
-        delta_rx_position_distribution = action_distributions["rx_position"]
+        action_distribution: torch.distributions.Distribution = self.actor(observations)
 
         # Sample actions
-        delta_device_states = delta_device_states_distribution.rsample(
-            sample_shape=(self.num_actor_samples,)
-        )
-        delta_tx_position = delta_tx_position_distribution.rsample(
-            sample_shape=(self.num_actor_samples,)
-        )
-        delta_rx_position = delta_rx_position_distribution.rsample(
-            sample_shape=(self.num_actor_samples,)
-        )
+        actions = action_distribution.rsample(sample_shape=(self.num_actor_samples,))
 
-        device_states_shape = np.array(observations[0]["device_states"]).shape
-        tx_position_shape = np.array(observations[0]["tx_position"]).shape
-        rx_position_shape = np.array(observations[0]["rx_position"]).shape
-
-        assert delta_device_states.shape == (
-            self.num_actor_samples,
-            batch_size,
-            *device_states_shape,
-        ), delta_device_states.shape
-        assert delta_tx_position.shape == (
-            self.num_actor_samples,
-            batch_size,
-            *tx_position_shape,
-        ), delta_tx_position.shape
-        assert delta_rx_position.shape == (
-            self.num_actor_samples,
-            batch_size,
-            *rx_position_shape,
-        ), delta_rx_position.shape
-
-        actions = {
-            "delta_device_states": delta_device_states,
-            "delta_tx_position": delta_tx_position,
-            "delta_rx_position": delta_rx_position,
-        }
         # TODO: Implement the rest of the function
         observations = self._replicate_observations(
             observations, self.num_actor_samples
@@ -603,16 +583,21 @@ class SoftActorCritic(nn.Module):
         # q_values = self.run_critics(observations, actions).view(-1)
 
         loss = torch.mean(-q_values)
-        return loss, torch.mean(self.entropy(action_distributions))
+        return loss, torch.mean(self.entropy(action_distribution))
         # return 0.0, 0.0
 
-    def _replicate_observations(self, observations: Observations, num_replicas: int):
+    def _replicate_observations(
+        self, observations: dict[torch.Tensor], num_replicas: int
+    ):
         """
         Replicate the observations to match the number of replicas.
         """
-        return [copy.deepcopy(observations) for _ in range(num_replicas)]
+        observations = {
+            k: v[None].expand((num_replicas, *v.shape)) for k, v in observations.items()
+        }
+        return observations
 
-    def update_actor(self, obs: Observations):
+    def update_actor(self, obs: dict[torch.Tensor]):
         """
         Update the actor by one gradient step using either REPARAMETRIZE or REINFORCE.
         """
@@ -652,11 +637,11 @@ class SoftActorCritic(nn.Module):
 
     def update(
         self,
-        observations: Observations,
-        actions: np.ndarray,
-        rewards: list[np.ndarray],
-        next_observations: Observations,
-        dones: list[np.ndarray],
+        observations: dict[torch.Tensor],
+        actions: torch.Tensor,
+        rewards: torch.Tensor,
+        next_observations: dict[torch.Tensor],
+        dones: torch.Tensor,
         step: int,
     ):
         """

@@ -8,9 +8,9 @@ env_name: wireless-sigmap-v2
 
 total_steps: 10000
 random_steps: 10
-training_starts: 7
+training_starts: 2
 
-batch_size: 4
+batch_size: 2
 replay_buffer_capacity: 50000
 
 discount: 0.99
