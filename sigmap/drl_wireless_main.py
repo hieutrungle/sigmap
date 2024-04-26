@@ -65,17 +65,6 @@ def run_training_loop(
     else:
         fps = env.env.metadata["render_fps"]
 
-    # ob_shape = env.observation_space["focal_pts"].shape
-    # ac_shape = env.action_space.shape
-    # ac_dim = np.prod(ac_shape)
-
-    # # initialize agent
-    # agent = SoftActorCritic(
-    #     ob_shape,
-    #     ac_dim,
-    #     **drl_config.agent_kwargs,
-    # )
-
     ob_space = env.observation_space
     ob_shapes = []
     for key in ob_space.keys():
@@ -83,7 +72,6 @@ def run_training_loop(
     ob_shapes = tuple(ob_shapes)
     ac_space = env.action_space
     ac_shape = ac_space.shape
-    # TODO: implement SAC with ob_space and ac_dim
     agent = SoftActorCritic(
         ob_shapes,
         ac_shape,
@@ -102,13 +90,11 @@ def run_training_loop(
     (observation, info) = env.reset()
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
-
-        action = agent.get_action(Observations(**ptu.add_batch_dimension(observation)))
         # accumulate data in replay buffer
         if step < drl_config.random_steps:
             action = env.action_space.sample()
         else:
-            # TODO: get correct action from agent
+            # // TODO: get correct action from agent
             action = agent.get_action(observation)
 
         # with timer.Timer(
@@ -135,12 +121,18 @@ def run_training_loop(
 
         # train agent
         if step > drl_config.training_starts:
-            # TODO: fix batch sampling
             batch = replay_buffer.sample(drl_config.batch_size)
-            obs, actions, rewards, next_obs, dones = batch
-
+            batch = ptu.from_numpy(batch)
+            obs, actions, rewards, next_obs, dones = (
+                batch["observations"],
+                batch["actions"],
+                batch["rewards"],
+                batch["next_observations"],
+                batch["dones"],
+            )
+            dones = dones.long()
             # TODO: implement update method in SAC
-            update_info = agent.update(obs, actions, rewards, next_obs, dones)
+            update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
             # logging
             update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
