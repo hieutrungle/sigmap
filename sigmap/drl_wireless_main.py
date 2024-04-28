@@ -143,8 +143,6 @@ def run_training_loop(
                     tsb_logger.log_scalar(v, k, step)
                 tsb_logger.flush()
 
-        if step == 10:
-            break
     print(f"len of replay buffer: {len(replay_buffer)}")
     return
 
