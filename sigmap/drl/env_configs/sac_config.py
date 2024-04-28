@@ -6,6 +6,7 @@ import torch.nn as nn
 
 from sigmap.drl.networks.mlp_policy import MLPPolicy
 from sigmap.drl.networks.state_action_value_critic import StateActionCritic
+from sigmap.drl.env_configs.schedule import CosineAnnealingWarmupRestarts
 import sigmap.drl.infrastructure.pytorch_utils as ptu
 
 import gymnasium as gym
@@ -86,7 +87,15 @@ def sac_config(
     def make_lr_schedule(
         optimizer: torch.optim.Optimizer,
     ) -> torch.optim.lr_scheduler._LRScheduler:
-        return torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+        return CosineAnnealingWarmupRestarts(
+            optimizer,
+            first_cycle_steps=total_steps,
+            cycle_mult=1.0,
+            max_lr=actor_learning_rate,
+            min_lr=actor_learning_rate / 50,
+            warmup_steps=int(total_steps / 3),
+            gamma=1 / 4,
+        )
 
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(

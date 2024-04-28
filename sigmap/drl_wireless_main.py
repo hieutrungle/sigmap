@@ -87,6 +87,7 @@ def run_training_loop(
         drl_config.replay_buffer_capacity, buffer_saved_dir
     )
 
+    best_return = -np.inf
     (observation, info) = env.reset()
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
@@ -112,9 +113,10 @@ def run_training_loop(
             next_observation=next_observation,
             done=done,
         )
+        train_return = info["episode"]["r"]
+        tsb_logger.log_scalar(train_return, "train_return", step)
+        tsb_logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
         if done:
-            tsb_logger.log_scalar(info["episode"]["r"], "train_return", step)
-            tsb_logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
             observation, info = env.reset()
         else:
             observation = next_observation
@@ -131,7 +133,6 @@ def run_training_loop(
                 batch["dones"],
             )
             dones = dones.long()
-            # TODO: implement update method in SAC
             update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
             # logging
@@ -142,6 +143,15 @@ def run_training_loop(
                 for k, v in update_info.items():
                     tsb_logger.log_scalar(v, k, step)
                 tsb_logger.flush()
+
+            if train_return > best_return:
+                best_return = train_return
+                saved_dir = os.path.join(assets_dir, f"saved_models")
+                utils.mkdir_not_exists(saved_dir)
+                saved_path = os.path.join(
+                    saved_dir, f"{drl_config.log_name}_best_model.pt"
+                )
+                agent.save(saved_path, step)
 
     print(f"len of replay buffer: {len(replay_buffer)}")
     return

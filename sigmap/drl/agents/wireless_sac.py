@@ -695,3 +695,16 @@ class SoftActorCritic(nn.Module):
             "actor_lr": self.actor_lr_scheduler.get_last_lr()[0],
             "critics_lr": self.critics_lr_scheduler.get_last_lr()[0],
         }
+
+    def save(self, path: str, step: int):
+        """
+        Save the actor and critic networks to a file.
+        """
+        torch.save(
+            {
+                "step": step,
+                "actor": self.actor.state_dict(),
+                "critics": [critic.state_dict() for critic in self.critics],
+            },
+            path,
+        )
