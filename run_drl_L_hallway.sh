@@ -59,6 +59,7 @@ SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${CONFIG_FILE}',
 
 # Create a temporary directory
 TMP_DIR=${SIGMAP_DIR}/tmp
+mkdir -p ${TMP_DIR}
 
 export BLENDER_APP
 export BLENDER_DIR
