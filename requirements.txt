@@ -8,3 +8,7 @@ PyYAML
 torch
 torchvision
 torchaudio
+opencv-python
+tqdm
+tensorboard
+tensorboardX

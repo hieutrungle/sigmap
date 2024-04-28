@@ -1,8 +1,14 @@
-import yaml
 import os
 from typing import Dict, List, Union, Tuple
 import argparse
 import re
+
+import time
+
+import sigmap.drl.env_configs
+from sigmap.drl.infrastructure.logger import TensorboardLogger
+import argparse
+from sigmap.utils import utils
 
 
 class Config:
@@ -16,11 +22,9 @@ class Config:
         return str(self.__dict__)
 
 
-def make_conf(conf_file: str) -> Config:
+def make_sionna_config(config_file: str) -> Config:
     config = Config()
-    config_kwargs = {}
-    with open(conf_file, "r") as f:
-        config_kwargs = yaml.safe_load(f)
+    config_kwargs = utils.load_yaml_file(config_file)
     for k, v in config_kwargs.items():
         if isinstance(v, str):
             if v.lower() == "true":
@@ -34,6 +38,31 @@ def make_conf(conf_file: str) -> Config:
 
     config.__dict__.update(config_kwargs)
     return config
+
+
+def make_drl_config(config_file: str, args: argparse.Namespace) -> Config:
+    config = Config()
+    config_kwargs = utils.load_yaml_file(config_file)
+    base_config_name = config_kwargs.pop("base_config")
+    config_kwargs.update({"args": args})
+    config.__dict__.update(
+        sigmap.drl.env_configs.configs[base_config_name](**config_kwargs)
+    )
+    return config
+
+
+def make_tensorboard_logger(config: dict) -> TensorboardLogger:
+    data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data")
+    if not (os.path.exists(data_path)):
+        os.makedirs(data_path)
+
+    # logdir = config["log_name"] + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
+    logdir = config.log_name + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
+    logdir = os.path.join(data_path, logdir)
+    if not (os.path.exists(logdir)):
+        os.makedirs(logdir)
+
+    return TensorboardLogger(logdir)
 
 
 def add_dict_to_argparser(

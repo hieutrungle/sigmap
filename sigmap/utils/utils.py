@@ -5,6 +5,9 @@ import argparse
 from sigmap.utils import logger
 import glob
 from typing import Dict, List, Union, Tuple
+import yaml
+import json
+import numpy as np
 
 
 def mkdir_not_exists(folder_dir: str) -> None:
@@ -164,3 +167,96 @@ def dict_to_csv(d: Dict[str, Union[str, float, bool]]) -> str:
     for k, v in d.items():
         csv += f"{k},{v}\n"
     return csv
+
+
+def load_yaml_file(file_path: str) -> dict:
+    with open(file_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def write_yaml_file(file_path: str, data: dict) -> None:
+    tmp_file = file_path.split(".")[0] + "_tmp.yaml"
+    with open(tmp_file, "w") as f:
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+    os.rename(tmp_file, file_path)
+
+
+class NpEncoder(json.JSONEncoder):
+    # json format for saving numpy array
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def get_tmp_dir():
+    tmp_dir = os.getenv("TMP_DIR")
+    if tmp_dir is None:
+        raise Exception("TMP_DIR environment variable is not set.")
+    mkdir_not_exists(tmp_dir)
+    return tmp_dir
+
+
+def get_assets_dir():
+    assets_dir = os.getenv("ASSETS_DIR")
+    if assets_dir is None:
+        raise Exception("ASSETS_DIR environment variable is not set.")
+    mkdir_not_exists(assets_dir)
+    return assets_dir
+
+
+def get_os_dir(name):
+    os_dir = os.getenv(name)
+    if os_dir is None:
+        raise Exception(f"{name} environment variable is not set.")
+    mkdir_not_exists(os_dir)
+    return os_dir
+
+
+# Read and write files
+def read_first_line(file_path: str) -> str:
+    with open(file_path, "rb") as f:
+        first_line = f.readline().decode()
+    return first_line
+
+
+def read_last_line(file_path: str) -> str:
+    with open(file_path, "rb") as f:
+        try:  # catch OSError in case of a one line file
+            f.seek(-2, os.SEEK_END)
+            while f.read(1) != b"\n":
+                f.seek(-2, os.SEEK_CUR)
+        except OSError:
+            f.seek(0)
+        last_line = f.readline().decode()
+    return last_line
+
+
+def read_n_to_last_line(filename, n=1) -> str:
+    """Returns the nth before last line of a file (n=1 gives last line)"""
+    num_newlines = 0
+    with open(filename, "rb") as f:
+        try:
+            f.seek(-2, os.SEEK_END)
+            while num_newlines < n:
+                f.seek(-2, os.SEEK_CUR)
+                if f.read(1) == b"\n":
+                    num_newlines += 1
+        except OSError:
+            f.seek(0)
+        n_to_last_line = f.readline().decode()
+
+    return n_to_last_line
+
+
+# Conversion
+def linear2dB(x: float) -> float:
+    return float(10 * np.log10(x))
+
+
+def dB2linear(x: float) -> float:
+    return float(10 ** (x / 10))

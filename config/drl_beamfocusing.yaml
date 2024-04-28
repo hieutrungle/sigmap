@@ -1,0 +1,24 @@
+base_config: wireless
+
+# Use clipped double-Q learning (from TD3)
+num_critic_networks: 2
+target_critic_backup_type: min
+exp_name: clipq
+env_name: wireless-sigmap-v2
+
+total_steps: 100
+random_steps: 10
+training_starts: 10
+
+batch_size: 8
+replay_buffer_capacity: 5000
+
+discount: 0.99
+use_soft_target_update: true
+soft_target_update_rate: 0.005
+
+actor_gradient_type: reparametrize
+num_critic_updates: 1
+
+use_entropy_bonus: true
+temperature: 0.05

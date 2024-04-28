@@ -6,12 +6,18 @@ import tensorflow as tf
 
 
 class SignalCoverageMap:
-    def __init__(self, args, config):
+    def __init__(
+        self,
+        config,
+        compute_scene_path: str,
+        viz_scene_path: str,
+        verbose: bool = False,
+    ):
         self.config = config
 
         # input directories
-        self._compute_scene_path = args.compute_scene_path
-        self._viz_scene_path = args.viz_scene_path
+        self._compute_scene_path = compute_scene_path
+        self._viz_scene_path = viz_scene_path
 
         # output directories
         self.img_dir = utils.get_image_dir(config)
@@ -19,16 +25,26 @@ class SignalCoverageMap:
         # Camera
         self._cam = map_prep.prepare_camera(self.config)
 
+        self.verbose = verbose
+
     @property
     def cam(self):
         return self._cam
 
-    @timer.Timer(
-        text="Elapsed coverage map time: {:0.4f} seconds\n", logger_fn=logger.log
-    )
     def compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
         # Compute coverage maps with ceiling on
-        logger.log(f"Computing coverage map for {self._compute_scene_path}")
+        if self.verbose:
+            logger.log(f"Computing coverage map for {self._compute_scene_path}")
+            with timer.Timer(
+                text="Elapsed coverage map time: {:0.4f} seconds\n",
+                logger_fn=logger.log,
+            ):
+                cmap = self._compute_cmap(**kwargs)
+        else:
+            cmap = self._compute_cmap(**kwargs)
+        return cmap
+
+    def _compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
         scene = map_prep.prepare_scene(self.config, self._compute_scene_path, self.cam)
 
         cm_kwargs = dict(
@@ -43,10 +59,20 @@ class SignalCoverageMap:
         cmap = scene.coverage_map(**cm_kwargs)
         return cmap
 
-    @timer.Timer(text="Elapsed paths time: {:0.4f} seconds\n", logger_fn=logger.log)
     def compute_paths(self, **kwargs) -> sionna.rt.Paths:
         # Compute coverage maps with ceiling on
-        logger.log(f"Computing paths for {self._compute_scene_path}")
+        if self.verbose:
+            logger.log(f"Computing paths for {self._compute_scene_path}")
+            with timer.Timer(
+                text="Elapsed paths time: {:0.4f} seconds\n",
+                logger_fn=logger.log,
+            ):
+                paths = self._compute_paths(**kwargs)
+        else:
+            paths = self._compute_paths(**kwargs)
+        return paths
+
+    def _compute_paths(self, **kwargs) -> sionna.rt.Paths:
         scene = map_prep.prepare_scene(self.config, self._compute_scene_path, self.cam)
 
         paths_kwargs = dict(
@@ -117,7 +143,7 @@ class SignalCoverageMap:
         )
         scene.render_to_file(**render_config)
 
-    def get_received_power_slow(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+    def get_path_gain_slow(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
         coverage_map_tensor = coverage_map.as_tensor()
         coverage_map_centers = coverage_map.cell_centers
         rx_position = self.config.rx_position
@@ -127,7 +153,7 @@ class SignalCoverageMap:
 
         return coverage_map_tensor[0, min_ind[0], min_ind[1]]
 
-    def get_received_power(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+    def get_path_gain(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
         coverage_map_tensor = coverage_map.as_tensor()
         coverage_map_centers = coverage_map.cell_centers
         rx_position = tf.convert_to_tensor(self.config.rx_position)

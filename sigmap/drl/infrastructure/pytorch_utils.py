@@ -6,7 +6,6 @@ from typing import Union, List
 import torch
 import torch.nn as nn
 import numpy as np
-from sigmap.utils import logger
 
 Activation = Union[str, nn.Module]
 
@@ -23,23 +22,27 @@ _str_to_activation = {
 DEVICE = None
 
 
-def build_mlp(
+def build_mlp_wireless(
     input_size: int,
     output_size: int,
-    hidden_sizes: List[int],
-    # n_layers: int,
-    activation: Activation = "relu",
+    n_layers: int,
+    size: int,
+    activation: Activation = "tanh",
     output_activation: Activation = "identity",
 ):
     """
     Builds a feedforward neural network
 
     arguments:
+        input_placeholder: placeholder variable for the state (batch_size, input_size)
+        scope: variable scope of the network
+
+        n_layers: number of hidden layers
+        size: dimension of each hidden layer
+        activation: activation of each hidden layer
+
         input_size: size of the input layer
         output_size: size of the output layer
-        hidden_size: dimension of each hidden layer
-        n_layers: number of hidden layers
-        activation: activation of each hidden layer
         output_activation: activation of the output layer
 
     returns:
@@ -49,13 +52,56 @@ def build_mlp(
         activation = _str_to_activation[activation]
     if isinstance(output_activation, str):
         output_activation = _str_to_activation[output_activation]
-
     layers = []
     in_size = input_size
-    for hidden_size in hidden_sizes:
-        layers.append(nn.Linear(in_size, hidden_size))
+    for _ in range(n_layers):
+        layers.append(nn.Linear(in_size, size))
         layers.append(activation)
-        in_size = hidden_size
+        in_size = size
+    layers.append(nn.Linear(in_size, output_size))
+    layers.append(output_activation)
+
+    mlp = nn.Sequential(*layers)
+    mlp.to(DEVICE)
+    return mlp
+
+
+def build_mlp(
+    input_size: int,
+    output_size: int,
+    n_layers: int,
+    size: int,
+    activation: Activation = "tanh",
+    output_activation: Activation = "identity",
+):
+    """
+    Builds a feedforward neural network
+
+    arguments:
+        input_placeholder: placeholder variable for the state (batch_size, input_size)
+        scope: variable scope of the network
+
+        n_layers: number of hidden layers
+        size: dimension of each hidden layer
+        activation: activation of each hidden layer
+
+        input_size: size of the input layer
+        output_size: size of the output layer
+        output_activation: activation of the output layer
+
+    returns:
+        output_placeholder: the result of a forward pass through the hidden layers + the output layer
+    """
+    if isinstance(activation, str):
+        activation = _str_to_activation[activation]
+    if isinstance(output_activation, str):
+        output_activation = _str_to_activation[output_activation]
+    layers = []
+    in_size = input_size
+    for _ in range(n_layers):
+        layers.append(nn.Linear(in_size, size))
+        layers.append(activation)
+        in_size = size
     layers.append(nn.Linear(in_size, output_size))
     layers.append(output_activation)
 
@@ -68,11 +114,11 @@ def init_gpu(use_gpu: bool = True, gpu_id: int = 0):
     global DEVICE
     if use_gpu and torch.cuda.is_available():
         DEVICE = torch.device(f"cuda:{gpu_id}")
-        logger.log(f"Using GPU {gpu_id} for PyTorch")
+        print(f"Using GPU {gpu_id} for PyTorch")
 
     else:
         DEVICE = torch.device("cpu")
-        logger.log("Using CPU for PyTorch")
+        print("Using CPU for PyTorch")
 
 
 def set_device(gpu_id: int):
@@ -94,3 +140,10 @@ def to_numpy(tensor: Union[torch.Tensor, dict]):
         return {k: to_numpy(v) for k, v in tensor.items()}
     else:
         return tensor.to("cpu").detach().numpy()
+
+
+def add_batch_dimension(data: Union[np.ndarray, dict]):
+    if isinstance(data, dict):
+        return {k: add_batch_dimension(v) for k, v in data.items()}
+    else:
+        return data[None, ...]
