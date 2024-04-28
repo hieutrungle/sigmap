@@ -46,15 +46,15 @@ class Actor(nn.Module):
         # self.state_dependent_std = state_dependent_std
         # self.fixed_std = fixed_std
 
-        focal_pts_shape = observation_shapes[0]
-        tx_position_shape = observation_shapes[1]
-        rx_position_shape = observation_shapes[2]
+        self.focal_pts_shape = observation_shapes[0]
+        self.tx_position_shape = observation_shapes[1]
+        self.rx_position_shape = observation_shapes[2]
 
         n_lower_layers = n_layers // 3
         self.action_shape = action_shape
 
         # focal points
-        in_size = np.prod(focal_pts_shape)
+        in_size = np.prod(self.focal_pts_shape)
         upper_layers = []
         n_upper_layers = n_layers - n_lower_layers
         for _ in range(n_upper_layers):
@@ -64,7 +64,7 @@ class Actor(nn.Module):
         self.upper_block = nn.Sequential(*upper_layers)
 
         # tx_poxsition + rx_position
-        in_size = np.prod(tx_position_shape) + np.prod(rx_position_shape)
+        in_size = np.prod(self.tx_position_shape) + np.prod(self.rx_position_shape)
         position_layers = []
         for _ in range(1):
             position_layers.append(nn.Linear(in_size, size))
@@ -82,6 +82,10 @@ class Actor(nn.Module):
         lower_layers.append(nn.Linear(in_size, np.prod(self.action_shape) * 2))
         lower_layers.append(output_activation)
         self.lower_block = nn.Sequential(*lower_layers)
+
+        self.focal_pts_flatten_len = np.prod(self.focal_pts_shape)
+        self.tx_position_flatten_len = np.prod(self.tx_position_shape)
+        self.rx_position_flatten_len = np.prod(self.rx_position_shape)
 
         # if self.state_dependent_std:
         #     lower_layers.append(nn.Linear(in_size, np.prod(action_shape) * 2))
@@ -106,33 +110,33 @@ class Actor(nn.Module):
         tx_positions: torch.Tensor = observations["tx_positions"]
         rx_positions: torch.Tensor = observations["rx_positions"]
 
-        batch_size = focal_pts.shape[0]
-
         # Flatten the inputs
         focal_pts = focal_pts.view(
-            *focal_pts.shape[:-3], torch.prod(focal_pts.shape[-3:])
+            *focal_pts.shape[: -len(self.focal_pts_shape)], self.focal_pts_flatten_len
         )
         tx_positions = tx_positions.view(
-            *tx_positions.shape[:-3], torch.prod(tx_positions.shape[-3:])
+            *tx_positions.shape[: -len(self.tx_position_shape)],
+            self.tx_position_flatten_len,
         )
         rx_positions = rx_positions.view(
-            *rx_positions.shape[:-3], torch.prod(rx_positions.shape[-3:])
+            *rx_positions.shape[: -len(self.rx_position_shape)],
+            self.rx_position_flatten_len,
         )
 
         focal = self.upper_block(focal_pts)
-        positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=1))
+        positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=-1))
         # Combine the two blocks
         # if self.state_dependent_std: means shape: (batch_size, 2 * ac_dim)
         # else: means shape: (batch_size, ac_dim)
-        combined = torch.cat([focal, positions], dim=1)
+        combined = torch.cat([focal, positions], dim=-1)
         mean_std = self.lower_block(combined)
 
         mean, std = torch.chunk(mean_std, 2, dim=-1)
         std = torch.nn.functional.softplus(std) + 1e-2
 
         # Convert to the correct shape
-        mean = mean.view((*mean.shape[:-3], *self.action_shape))
-        std = std.view((*std.shape[:-3], *self.action_shape))
+        mean = mean.view((*mean.shape[:-1], *self.action_shape))
+        std = std.view((*std.shape[:-1], *self.action_shape))
 
         # if self.state_dependent_std:
         #     mean, std = torch.chunk(means, 2, dim=-1)
@@ -166,15 +170,15 @@ class Critic(nn.Module):
             output_activation = _str_to_activation[output_activation]
 
         # Shape without batch dimension
-        focal_pts_shape = observation_shapes[0]
-        tx_position_shape = observation_shapes[1]
-        rx_position_shape = observation_shapes[2]
-
-        n_lower_layers = n_layers // 3
+        self.focal_pts_shape = observation_shapes[0]
+        self.tx_position_shape = observation_shapes[1]
+        self.rx_position_shape = observation_shapes[2]
         self.action_shape = action_shape
 
+        n_lower_layers = n_layers // 3
+
         # focal points
-        in_size = np.prod(focal_pts_shape) + np.prod(self.action_shape)
+        in_size = np.prod(self.focal_pts_shape) + np.prod(self.action_shape)
         upper_layers = []
         n_upper_layers = n_layers - n_lower_layers
         for _ in range(n_upper_layers):
@@ -184,7 +188,7 @@ class Critic(nn.Module):
         self.upper_block = nn.Sequential(*upper_layers)
 
         # tx_poxsition + rx_position
-        in_size = np.prod(tx_position_shape) + np.prod(rx_position_shape)
+        in_size = np.prod(self.tx_position_shape) + np.prod(self.rx_position_shape)
         position_layers = []
         for _ in range(1):
             position_layers.append(nn.Linear(in_size, size))
@@ -203,6 +207,11 @@ class Critic(nn.Module):
         lower_layers.append(output_activation)
         self.lower_block = nn.Sequential(*lower_layers)
 
+        self.focal_pts_flatten_len = np.prod(self.focal_pts_shape)
+        self.tx_position_flatten_len = np.prod(self.tx_position_shape)
+        self.rx_position_flatten_len = np.prod(self.rx_position_shape)
+        self.action_flatten_len = np.prod(self.action_shape)
+
     def forward(
         self,
         observations: dict,
@@ -216,20 +225,24 @@ class Critic(nn.Module):
 
         # Flatten the inputs
         focal_pts = focal_pts.view(
-            *focal_pts.shape[:-3], torch.prod(focal_pts.shape[-3:])
+            *focal_pts.shape[: -len(self.focal_pts_shape)], self.focal_pts_flatten_len
         )
         tx_positions = tx_positions.view(
-            *tx_positions.shape[:-3], torch.prod(tx_positions.shape[-3:])
+            *tx_positions.shape[: -len(self.tx_position_shape)],
+            self.tx_position_flatten_len,
         )
         rx_positions = rx_positions.view(
-            *rx_positions.shape[:-3], torch.prod(rx_positions.shape[-3:])
+            *rx_positions.shape[: -len(self.rx_position_shape)],
+            self.rx_position_flatten_len,
         )
-        actions = actions.view(*actions.shape[:-3], torch.prod(actions.shape[-3:]))
+        actions = actions.view(
+            *actions.shape[: -len(self.action_shape)], self.action_flatten_len
+        )
 
-        mixed = torch.cat([focal_pts, actions], dim=1)
+        mixed = torch.cat([focal_pts, actions], dim=-1)
         mixed = self.upper_block(mixed)
-        positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=1))
-        combined = torch.cat([mixed, positions], dim=1)
+        positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=-1))
+        combined = torch.cat([mixed, positions], dim=-1)
         q_values = self.lower_block(combined)
 
         return q_values.squeeze(-1)

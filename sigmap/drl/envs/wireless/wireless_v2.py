@@ -166,7 +166,7 @@ class WirelessEnvV2(Env):
         config = {}
         config["tx_positions"] = [1.0, 0.0, 1.5]
         config["rx_positions"] = [-3.0, -4.2, 1.5]
-        config["cm_num_samples"] = 1e6 // 2
+        config["cm_num_samples"] = 2e6
         config["cm_max_depth"] = 15
         config["path_num_samples"] = 1e6
         config["path_max_depth"] = 2
