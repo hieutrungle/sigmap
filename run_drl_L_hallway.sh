@@ -72,4 +72,4 @@ export TMP_DIR
 # DRL run
 ##############################
 DEVICE_CONFIG="--num_devices 1 --num_tiles_per_device 70 --controlled_elements 2"
-python sigmap/drl_wireless_main.py -dcfg ./config/drl_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
+python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py -dcfg ./config/drl_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG

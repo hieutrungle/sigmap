@@ -93,7 +93,7 @@ def sac_config(
             cycle_mult=1.0,
             max_lr=actor_learning_rate,
             min_lr=actor_learning_rate / 50,
-            warmup_steps=int(total_steps / 3),
+            warmup_steps=int(total_steps // 3),
             gamma=1 / 4,
         )
 
