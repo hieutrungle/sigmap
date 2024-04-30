@@ -211,5 +211,5 @@ class CosineAnnealingWarmupRestarts(_LRScheduler):
         for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
             param_group["lr"] = lr
 
-    def get_last_lr(self) -> torch.List[float]:
+    def get_last_lr(self):
         return self.get_lr()
