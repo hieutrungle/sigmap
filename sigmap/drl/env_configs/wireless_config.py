@@ -4,12 +4,9 @@ import torch
 import torch.nn as nn
 from sigmap.drl.networks.mlp_policy import MLPPolicy
 from sigmap.drl.networks.state_action_value_critic import StateActionCritic
-import sigmap.drl.infrastructure.pytorch_utils as ptu
 
 import gymnasium as gym
-from gymnasium.wrappers.rescale_action import RescaleAction
-from gymnasium.wrappers.clip_action import ClipAction
-from gymnasium.wrappers import TimeLimit
+from sigmap.drl.env_configs.schedule import CosineAnnealingWarmupRestarts
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 import argparse
@@ -21,8 +18,8 @@ def wireless_config(
     exp_name: Optional[str] = None,
     hidden_size: int = 128,
     num_layers: int = 3,
-    actor_learning_rate: float = 3e-4,
-    critic_learning_rate: float = 3e-4,
+    actor_learning_rate: float = 5e-4,
+    critic_learning_rate: float = 5e-4,
     total_steps: int = 300000,
     random_steps: int = 5000,
     training_starts: int = 10000,
@@ -96,7 +93,17 @@ def wireless_config(
     def make_lr_schedule(
         optimizer: torch.optim.Optimizer,
     ) -> torch.optim.lr_scheduler._LRScheduler:
-        return torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+        max_lr = (actor_learning_rate + critic_learning_rate) / 2
+        min_lr = max_lr / 50
+        return CosineAnnealingWarmupRestarts(
+            optimizer,
+            first_cycle_steps=int(total_steps // 2),
+            cycle_mult=1.0,
+            max_lr=max_lr,
+            min_lr=min_lr,
+            warmup_steps=int(total_steps // 8),
+            gamma=1 / 4,
+        )
 
     def make_env(render: bool = False):
         return RecordEpisodeStatistics(
