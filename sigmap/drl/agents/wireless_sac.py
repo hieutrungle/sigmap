@@ -340,6 +340,9 @@ class SoftActorCritic(nn.Module):
 
         self.update_target_critics()
 
+        # Moving average reward
+        self.moving_average_reward = None
+
     def get_action(self, observation: dict[np.ndarray]) -> np.ndarray:
         """
         Compute an action for a given observation.
@@ -495,17 +498,37 @@ class SoftActorCritic(nn.Module):
                 next_qs += self.temperature * next_actions_entropy
 
             # Compute target Q-values
-            rewards = (
-                rewards[None]
+            # rewards = (
+            #     rewards[None]
+            #     .expand((self.num_critic_networks, batch_size))
+            #     .contiguous()
+            # )
+            # dones = (
+            #     dones[None].expand((self.num_critic_networks, batch_size)).contiguous()
+            # )
+            # rewards = self.dB2linear(rewards)
+            # next_qs = self.dB2linear(next_qs)
+            # target_values: torch.Tensor = rewards + self.discount * next_qs * (
+            #     1 - 1.0 * dones
+            # )
+            # target_values = self.linear2dB(target_values)  # in dB
+
+            advantages = rewards - self.moving_average_reward
+            advantages = (
+                advantages[None]
                 .expand((self.num_critic_networks, batch_size))
                 .contiguous()
             )
             dones = (
                 dones[None].expand((self.num_critic_networks, batch_size)).contiguous()
             )
-            target_values: torch.Tensor = rewards + self.discount * next_qs * (
+            advantages = self.dB2linear(advantages)
+            next_qs = self.dB2linear(next_qs)
+            target_values: torch.Tensor = advantages + self.discount * next_qs * (
                 1 - 1.0 * dones
             )
+            target_values = self.linear2dB(target_values)  # in dB
+
             assert target_values.shape == (
                 self.num_critic_networks,
                 batch_size,
@@ -515,7 +538,7 @@ class SoftActorCritic(nn.Module):
         q_values = self.run_critics(observations, actions)
         assert q_values.shape == (self.num_critic_networks, batch_size), q_values.shape
 
-        critics_loss = self.critic_loss(q_values, target_values)
+        critics_loss: torch.Tensor = self.critic_loss(q_values, target_values)
         self.critics_optimizer.zero_grad()
         critics_loss.backward()
         self.critics_optimizer.step()
@@ -586,7 +609,6 @@ class SoftActorCritic(nn.Module):
         # Sample actions
         actions = action_distribution.rsample(sample_shape=(self.num_actor_samples,))
 
-        # TODO: Implement the rest of the function
         observations = self._replicate_observations(
             observations, self.num_actor_samples
         )
@@ -661,6 +683,14 @@ class SoftActorCritic(nn.Module):
         Update the actor and critic networks.
         """
 
+        # Moving average reward
+        if self.moving_average_reward is None:
+            self.moving_average_reward = rewards.mean().item()
+        else:
+            self.moving_average_reward = (
+                self.moving_average_reward * 0.99 + rewards.mean().item() * 0.01
+            )
+
         critic_infos = []
         for _ in range(self.num_critic_updates):
             info = self.update_critics(
@@ -708,3 +738,9 @@ class SoftActorCritic(nn.Module):
             },
             path,
         )
+
+    def linear2dB(self, x: torch.Tensor) -> torch.Tensor:
+        return 10 * torch.log10(x)
+
+    def dB2linear(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.pow(10, torch.div(x, 10))
