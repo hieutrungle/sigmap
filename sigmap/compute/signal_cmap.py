@@ -3,7 +3,7 @@ import os
 import sionna.rt
 from typing import List
 import tensorflow as tf
-
+import gc
 
 class SignalCoverageMap:
     def __init__(
@@ -43,7 +43,7 @@ class SignalCoverageMap:
         else:
             cmap = self._compute_cmap(**kwargs)
 
-        tf.keras.backend.clear_session(free_memory=True)
+        self.free_memory()
         return cmap
 
     def _compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
@@ -73,7 +73,7 @@ class SignalCoverageMap:
         else:
             paths = self._compute_paths(**kwargs)
 
-        tf.keras.backend.clear_session(free_memory=True)
+        self.free_memory()
         return paths
 
     def _compute_paths(self, **kwargs) -> sionna.rt.Paths:
@@ -174,3 +174,8 @@ class SignalCoverageMap:
     def get_viz_scene(self) -> sionna.rt.Scene:
         scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
         return scene
+
+    def free_memory(self) -> None:
+        tf.keras.backend.clear_session()
+        gc.collect()
+        
