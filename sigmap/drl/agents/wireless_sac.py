@@ -684,12 +684,13 @@ class SoftActorCritic(nn.Module):
         """
 
         # Moving average reward
-        if self.moving_average_reward is None:
-            self.moving_average_reward = rewards.mean().item()
-        else:
-            self.moving_average_reward = (
-                self.moving_average_reward * 0.99 + rewards.mean().item() * 0.01
-            )
+        self.moving_average_reward = -100
+        # if self.moving_average_reward is None:
+        #     self.moving_average_reward = rewards.mean().item()
+        # else:
+        #     self.moving_average_reward = (
+        #         self.moving_average_reward * 0.99 + rewards.mean().item() * 0.01
+        #     )
 
         critic_infos = []
         for _ in range(self.num_critic_updates):
@@ -724,6 +725,7 @@ class SoftActorCritic(nn.Module):
             **critic_info,
             "actor_lr": self.actor_lr_scheduler.get_last_lr()[0],
             "critics_lr": self.critics_lr_scheduler.get_last_lr()[0],
+            "moving_average_reward": self.moving_average_reward,
         }
 
     def save(self, path: str, step: int):
