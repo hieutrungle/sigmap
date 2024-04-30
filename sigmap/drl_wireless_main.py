@@ -138,6 +138,13 @@ def run_training_loop(
             dones = dones.long()
             update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
+            obs = ptu.to_numpy(obs)
+            actions = ptu.to_numpy(actions)
+            rewards = ptu.to_numpy(rewards)
+            next_obs = ptu.to_numpy(next_obs)
+            dones = ptu.to_numpy(dones)
+            batch = ptu.to_numpy(batch)
+
             # logging
             # update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
             # update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]

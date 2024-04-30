@@ -42,6 +42,8 @@ class SignalCoverageMap:
                 cmap = self._compute_cmap(**kwargs)
         else:
             cmap = self._compute_cmap(**kwargs)
+
+        tf.keras.backend.clear_session(free_memory=True)
         return cmap
 
     def _compute_cmap(self, **kwargs) -> sionna.rt.CoverageMap:
@@ -70,6 +72,8 @@ class SignalCoverageMap:
                 paths = self._compute_paths(**kwargs)
         else:
             paths = self._compute_paths(**kwargs)
+
+        tf.keras.backend.clear_session(free_memory=True)
         return paths
 
     def _compute_paths(self, **kwargs) -> sionna.rt.Paths:

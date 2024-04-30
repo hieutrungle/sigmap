@@ -288,6 +288,8 @@ class WirelessEnvV2(Env):
         path_gain = sig_cmap.get_path_gain(
             coverage_map,
         )
+        del coverage_map
+        del sig_cmap
         path_gain = float(path_gain)
         path_gain_dB = utils.linear2dB(path_gain)
         return path_gain_dB
