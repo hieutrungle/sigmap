@@ -55,7 +55,7 @@ fi
 ${BLENDER_APP} -b ${BLENDER_DIR}/models/simple_hallway_color.blend --python ${SIGMAP_DIR}/sigmap/blender_script/install_mitsuba_addon.py
 
 # get scene_name from CONFIG_FILE
-SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${CONFIG_FILE}', 'r'))['scene_name'])")
+# SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${CONFIG_FILE}', 'r'))['scene_name'])")
 
 # Create a temporary directory
 TMP_DIR=${SIGMAP_DIR}/tmp
