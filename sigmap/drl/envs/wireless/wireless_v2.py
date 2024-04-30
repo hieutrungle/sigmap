@@ -8,6 +8,7 @@ import numpy as np
 from gymnasium import Env, spaces
 from sigmap.utils import utils
 import sigmap
+import time
 
 
 class WirelessEnvV2(Env):
@@ -26,6 +27,8 @@ class WirelessEnvV2(Env):
     ):
         super(WirelessEnvV2, self).__init__()
 
+        self.current_time = "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
+
         self.num_devices = num_devices
         self.num_tiles_per_device = num_tiles_per_device
         self.controlled_elements = controlled_elements
@@ -41,10 +44,10 @@ class WirelessEnvV2(Env):
         # Observation space
         # Each device has 2 focal points
         self.focal_pts_shape = (num_devices, 2, 3)
-        low = np.array([-25, -25, -10])
+        low = np.array([-20, -20, -5])
         low = np.tile(low, (self.num_devices, 2, 1))
         self.focal_pts_low = low
-        high = np.array([25, 25, 10])
+        high = np.array([20, 20, 5])
         high = np.tile(high, (self.num_devices, 2, 1))
         self.focal_pts_high = high
         focal_pts_space = spaces.Box(
@@ -70,7 +73,7 @@ class WirelessEnvV2(Env):
         # Action space
         # represent the delta x, y, z of the focal points
         self.action_space = spaces.Box(
-            -2.5, 2.5, shape=self.focal_pts_shape, dtype=np.float32
+            -1.1, 1.1, shape=self.focal_pts_shape, dtype=np.float32
         )
 
         # State of all devices
@@ -93,9 +96,12 @@ class WirelessEnvV2(Env):
         self.ep_step = 0
 
         # Random initial state
-        self._focal_pts = np.random.uniform(
-            self.focal_pts_low, self.focal_pts_high, size=self.focal_pts_shape
-        )
+        # self._focal_pts = np.random.uniform(
+        #     self.focal_pts_low, self.focal_pts_high, size=self.focal_pts_shape
+        # )
+        self._focal_pts = np.random.randn(*self.focal_pts_shape)
+        self._focal_pts[:, 0] += self._default_tx_positions
+        self._focal_pts[:, 1] += self._default_rx_positions
         self._focal_pts = np.asarray(self._focal_pts, dtype=np.float32)
         self._focal_pts = np.clip(
             self._focal_pts, self.focal_pts_low, self.focal_pts_high
@@ -114,8 +120,20 @@ class WirelessEnvV2(Env):
         self, action: np.ndarray, **kwargs
     ) -> Tuple[dict, float, bool, bool, dict]:
 
+        # next observation
+        self._focal_pts = self._focal_pts + action
+        self._focal_pts = np.clip(
+            self._focal_pts, self.focal_pts_low, self.focal_pts_high
+        )
+        next_observation = self._get_obs()
+
         # termination
+        # Check if self._focal_pts is out of bounds
         terminated = False
+        if np.any(self._focal_pts < self.focal_pts_low) or np.any(
+            self._focal_pts > self.focal_pts_high
+        ):
+            terminated = True
 
         # truncation
         self.ep_step += 1
@@ -126,13 +144,6 @@ class WirelessEnvV2(Env):
         ## Open Blender to read the file and assign values to devices' tiles
         ## Then export the geometry file to Sionna
         reward = self._cal_reward(self._focal_pts)
-
-        # next observation
-        self._focal_pts = self._focal_pts + action
-        self._focal_pts = np.clip(
-            self._focal_pts, self.focal_pts_low, self.focal_pts_high
-        )
-        next_observation = self._get_obs()
 
         # info
         self.info.update({"episode": {"r": reward, "l": self.ep_step}})
@@ -263,9 +274,20 @@ class WirelessEnvV2(Env):
         sig_cmap = sigmap.compute.signal_cmap.SignalCoverageMap(
             config, compute_scene_path, viz_scene_path
         )
+
         coverage_map = sig_cmap.compute_cmap()
-        sig_cmap.render_to_file(coverage_map)
-        path_gain = sig_cmap.get_path_gain(coverage_map)
+
+        img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
+        mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
+            "mitsuba_filename"
+        ]
+        render_filename = utils.create_filename(
+            img_dir, f"{mitsuba_filename}_00000.png"
+        )
+        sig_cmap.render_to_file(coverage_map, filename=render_filename)
+        path_gain = sig_cmap.get_path_gain(
+            coverage_map,
+        )
         path_gain = float(path_gain)
         path_gain_dB = utils.linear2dB(path_gain)
         return path_gain_dB
