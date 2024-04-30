@@ -8,12 +8,12 @@ env_name: wireless-sigmap-v2
 actor_learning_rate: 0.001
 critic_learning_rate: 0.001
 
-total_steps: 10000
-random_steps: 70
-training_starts: 70
+total_steps: 5000
+random_steps: 130
+training_starts: 130
 
-batch_size: 64
-replay_buffer_capacity: 15000
+batch_size: 128
+replay_buffer_capacity: 6000
 
 discount: 0.99
 use_soft_target_update: true
