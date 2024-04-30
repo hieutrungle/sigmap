@@ -5,6 +5,7 @@ from typing import List
 import tensorflow as tf
 import gc
 
+
 class SignalCoverageMap:
     def __init__(
         self,
@@ -147,7 +148,7 @@ class SignalCoverageMap:
         )
         scene.render_to_file(**render_config)
 
-    def get_path_gain_slow(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+    def get_path_gain_slow(self, coverage_map: sionna.rt.CoverageMap) -> float:
         coverage_map_tensor = coverage_map.as_tensor()
         coverage_map_centers = coverage_map.cell_centers
         rx_position = self.config.rx_position
@@ -155,9 +156,11 @@ class SignalCoverageMap:
         min_dist = tf.reduce_min(distances)
         min_ind = tf.where(tf.equal(distances, min_dist))[0]
 
-        return coverage_map_tensor[0, min_ind[0], min_ind[1]]
+        path_gain: tf.Tensor = coverage_map_tensor[0, min_ind[0], min_ind[1]]
+        path_gain = float(path_gain.numpy())
+        return path_gain
 
-    def get_path_gain(self, coverage_map: sionna.rt.CoverageMap) -> tf.Tensor:
+    def get_path_gain(self, coverage_map: sionna.rt.CoverageMap) -> float:
         coverage_map_tensor = coverage_map.as_tensor()
         coverage_map_centers = coverage_map.cell_centers
         rx_position = tf.convert_to_tensor(self.config.rx_position)
@@ -169,7 +172,9 @@ class SignalCoverageMap:
         ind_y = int(y_distance_to_top_left / coverage_map.cell_size[1])
         ind_x = int(x_distance_to_top_left / coverage_map.cell_size[0])
 
-        return coverage_map_tensor[0, ind_y, ind_x]
+        path_gain: tf.Tensor = coverage_map_tensor[0, ind_y, ind_x]
+        path_gain = float(path_gain.numpy())
+        return path_gain
 
     def get_viz_scene(self) -> sionna.rt.Scene:
         scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
@@ -178,4 +183,3 @@ class SignalCoverageMap:
     def free_memory(self) -> None:
         tf.keras.backend.clear_session()
         gc.collect()
-        
