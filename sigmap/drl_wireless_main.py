@@ -92,7 +92,10 @@ def run_training_loop(
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
         # accumulate data in replay buffer
-        if step < drl_config.random_steps:
+        if step < drl_config.random_steps // 2:
+            observation, info = env.reset()
+            action = env.action_space.sample()
+        elif step < drl_config.random_steps:
             action = env.action_space.sample()
         else:
             # // TODO: get correct action from agent
@@ -136,8 +139,8 @@ def run_training_loop(
             update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
             # logging
-            update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
-            update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]
+            # update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
+            # update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]
 
             if step % args.log_interval == 0:
                 for k, v in update_info.items():
