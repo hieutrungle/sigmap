@@ -34,7 +34,8 @@ def main():
     )
     coverage_map = sig_cmap.compute_cmap() if args.cmap_enabled else None
     paths = sig_cmap.compute_paths() if args.paths_enabled else None
-    sig_cmap.render_to_file(coverage_map, paths)
+
+    sig_cmap.render_to_file(coverage_map, paths, filename=args.saved_path)
 
     # Compute received power
     path_gain = sig_cmap.get_path_gain(coverage_map)
@@ -44,7 +45,7 @@ def main():
     results_dict = {
         # "tx_position": config.tx_position,
         # "rx_position": config.rx_position,
-        "path_gain": path_gain.numpy(),
+        "path_gain": path_gain,
     }
     with open(results_file, "w") as f:
         json.dump(results_dict, f, cls=utils.NpEncoder)
@@ -58,10 +59,10 @@ def create_args() -> argparse.ArgumentParser:
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
     parser.add_argument("--compute_scene_path", "-cp", type=str, required=True)
     parser.add_argument("--viz_scene_path", "-vp", type=str)
+    parser.add_argument("--saved_path", type=str, default=None)
     parser.add_argument("--cmap_enabled", action="store_true", default=False)
     parser.add_argument("--paths_enabled", action="store_true", default=False)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
-    parser.add_argument("--video_enabled", action="store_true", default=False)
     scripting_utils.add_dict_to_argparser(parser, defaults)
     args = parser.parse_args()
     if args.viz_scene_path is None or args.viz_scene_path == "":
