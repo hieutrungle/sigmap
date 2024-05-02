@@ -42,8 +42,8 @@ def main():
     tmp_dir = utils.get_tmp_dir()
     results_file = os.path.join(tmp_dir, "path_gain.txt")
     results_dict = {
-        "tx_position": config.tx_position,
-        "rx_position": config.rx_position,
+        # "tx_position": config.tx_position,
+        # "rx_position": config.rx_position,
         "path_gain": path_gain.numpy(),
     }
     with open(results_file, "w") as f:

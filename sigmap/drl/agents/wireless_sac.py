@@ -644,7 +644,7 @@ class SoftActorCritic(nn.Module):
 
         # Add entropy if necessary
         if self.use_entropy_bonus:
-            loss -= self.temperature * entropy
+            loss = loss - self.temperature * entropy
 
         self.actor_optimizer.zero_grad()
         loss.backward()

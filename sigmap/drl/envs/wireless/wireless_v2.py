@@ -9,6 +9,8 @@ from gymnasium import Env, spaces
 from sigmap.utils import utils
 import sigmap
 import time
+import matplotlib.pyplot as plt
+import json
 
 
 class WirelessEnvV2(Env):
@@ -268,30 +270,58 @@ class WirelessEnvV2(Env):
             .decode()
             .strip()
         )
-        config = sigmap.utils.scripting_utils.make_sionna_config(
-            self.sionna_config_file
-        )
-        sig_cmap = sigmap.compute.signal_cmap.SignalCoverageMap(
-            config, compute_scene_path, viz_scene_path
-        )
 
-        coverage_map = sig_cmap.compute_cmap()
-
-        img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
-        mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
-            "mitsuba_filename"
+        sionna_command = [
+            "python",
+            "-cfg",
+            self.sionna_config_file,
+            "--compute_scene_path",
+            compute_scene_path,
+            "--viz_scene_path",
+            viz_scene_path,
+            "--cmap_enabled",
         ]
-        render_filename = utils.create_filename(
-            img_dir, f"{mitsuba_filename}_00000.png"
-        )
-        sig_cmap.render_to_file(coverage_map, filename=render_filename)
-        path_gain = sig_cmap.get_path_gain(
-            coverage_map,
-        )
-        del coverage_map
-        del sig_cmap
+        tmp_dir = utils.get_tmp_dir()
+        sionna_output_txt = os.path.join(tmp_dir, "sionna_outputs.txt")
+        try:
+            subprocess.run(
+                sionna_command, check=True, stdout=open(sionna_output_txt, "a")
+            )
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Error running Blender command: {e}")
+        finally:
+            pass
+
+        # config = sigmap.utils.scripting_utils.make_sionna_config(
+        #     self.sionna_config_file
+        # )
+        # sig_cmap = sigmap.compute.signal_cmap.SignalCoverageMap(
+        #     config, compute_scene_path, viz_scene_path
+        # )
+
+        # coverage_map = sig_cmap.compute_cmap()
+
+        # img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
+        # mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
+        #     "mitsuba_filename"
+        # ]
+        # render_filename = utils.create_filename(
+        #     img_dir, f"{mitsuba_filename}_00000.png"
+        # )
+        # # sig_cmap.render_to_file(coverage_map, filename=render_filename)
+        # path_gain = sig_cmap.get_path_gain(
+        #     coverage_map,
+        # )
+        # del coverage_map
+        # del sig_cmap
+        results_file = os.path.join(tmp_dir, "path_gain.txt")
+        with open(results_file, "r") as f:
+            results_dict = json.load(f)
+            path_gain = results_dict["path_gain"]
         path_gain = float(path_gain)
         path_gain_dB = utils.linear2dB(path_gain)
+        plt.clf()
+        plt.close("all")
         return path_gain_dB
 
     def _modify_config_file(self, config_file, **kwargs):
