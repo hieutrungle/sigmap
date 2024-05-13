@@ -75,7 +75,7 @@ class WirelessEnvV2(Env):
         # Action space
         # represent the delta x, y, z of the focal points
         self.action_space = spaces.Box(
-            -1.1, 1.1, shape=self.focal_pts_shape, dtype=np.float32
+            -0.505, 0.505, shape=self.focal_pts_shape, dtype=np.float32
         )
 
         # State of all devices
