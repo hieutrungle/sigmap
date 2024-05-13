@@ -8,6 +8,7 @@ import argparse
 gpu_num = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"  # to avoid memory fragmentation
 
 from sigmap.drl.agents.wireless_sac import SoftActorCritic
 from sigmap.drl.infrastructure.replay_buffer import WirelessReplayBuffer
@@ -110,61 +111,60 @@ def run_training_loop(
         done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
         reward = np.array(reward, dtype=np.float32)
         done = np.array(done, dtype=np.float32)
-        # replay_buffer.insert(
-        #     observation=observation,
-        #     action=action,
-        #     reward=reward,
-        #     next_observation=next_observation,
-        #     done=done,
-        # )
-        # train_return = info["episode"]["r"]
-        # tsb_logger.log_scalar(train_return, "train_return", step)
-        # tsb_logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
+        replay_buffer.insert(
+            observation=observation,
+            action=action,
+            reward=reward,
+            next_observation=next_observation,
+            done=done,
+        )
+        train_return = info["episode"]["r"]
+        tsb_logger.log_scalar(train_return, "train_return", step)
+        tsb_logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
         if done:
             observation, info = env.reset()
         else:
             observation = next_observation
 
         # train agent
-        # if step > drl_config.training_starts:
-        #     batch = replay_buffer.sample(drl_config.batch_size)
-        #     batch = ptu.from_numpy(batch)
-        #     obs, actions, rewards, next_obs, dones = (
-        #         batch["observations"],
-        #         batch["actions"],
-        #         batch["rewards"],
-        #         batch["next_observations"],
-        #         batch["dones"],
-        #     )
-        #     dones = dones.long()
-        #     update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
+        if step > drl_config.training_starts:
+            batch = replay_buffer.sample(drl_config.batch_size)
+            batch = ptu.from_numpy(batch)
+            obs, actions, rewards, next_obs, dones = (
+                batch["observations"],
+                batch["actions"],
+                batch["rewards"],
+                batch["next_observations"],
+                batch["dones"],
+            )
+            dones = dones.long()
+            update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
-        #     obs = ptu.to_numpy(obs)
-        #     actions = ptu.to_numpy(actions)
-        #     rewards = ptu.to_numpy(rewards)
-        #     next_obs = ptu.to_numpy(next_obs)
-        #     dones = ptu.to_numpy(dones)
-        #     batch = ptu.to_numpy(batch)
+            obs = ptu.to_numpy(obs)
+            actions = ptu.to_numpy(actions)
+            rewards = ptu.to_numpy(rewards)
+            next_obs = ptu.to_numpy(next_obs)
+            dones = ptu.to_numpy(dones)
+            batch = ptu.to_numpy(batch)
 
-        #     # logging
-        #     # update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
-        #     # update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]
+            # logging
+            # update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
+            # update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]
 
-        #     if step % args.log_interval == 0:
-        #         for k, v in update_info.items():
-        #             tsb_logger.log_scalar(v, k, step)
-        #         tsb_logger.flush()
+            if step % args.log_interval == 0:
+                for k, v in update_info.items():
+                    tsb_logger.log_scalar(v, k, step)
+                tsb_logger.flush()
 
-        #     if train_return > best_return:
-        #         best_return = train_return
-        #         saved_dir = os.path.join(assets_dir, f"saved_models")
-        #         utils.mkdir_not_exists(saved_dir)
-        #         saved_path = os.path.join(
-        #             saved_dir, f"{drl_config.log_name}_best_model.pt"
-        #         )
-        #         agent.save(saved_path, step)
+            if train_return > best_return:
+                best_return = train_return
+                saved_dir = os.path.join(assets_dir, f"saved_models")
+                utils.mkdir_not_exists(saved_dir)
+                saved_path = os.path.join(
+                    saved_dir, f"{drl_config.log_name}_best_model.pt"
+                )
+                agent.save(saved_path, step)
 
-    print(f"len of replay buffer: {len(replay_buffer)}")
     return
 
 
