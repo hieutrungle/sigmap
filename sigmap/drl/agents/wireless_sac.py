@@ -8,6 +8,7 @@ from typing import Union
 from sigmap.drl.infrastructure.distributions import (
     make_tanh_transformed,
     make_multi_normal,
+    make_scaled_tanh_transformed,
 )
 from sigmap.drl.infrastructure.data_types import Observations
 
@@ -33,10 +34,13 @@ class Actor(nn.Module):
         size: int = 128,
         activation: Activation = "tanh",
         output_activation: Activation = "identity",
+        scale: float = 1.0,
         # state_dependent_std: bool = False,
         # fixed_std: Optional[float] = None,
     ):
         super().__init__()
+
+        self.scale = scale
 
         if isinstance(activation, str):
             activation = _str_to_activation[activation]
@@ -132,7 +136,7 @@ class Actor(nn.Module):
         mean_std = self.lower_block(combined)
 
         mean, std = torch.chunk(mean_std, 2, dim=-1)
-        std = torch.nn.functional.softplus(std) + 1e-2
+        std: torch.Tensor = torch.nn.functional.softplus(std) + 1e-2
 
         # Convert to the correct shape
         mean = mean.view((*mean.shape[:-1], *self.action_shape))
@@ -148,7 +152,7 @@ class Actor(nn.Module):
         #     else:
         #         std = torch.nn.functional.softplus(self.std) + 1e-2
 
-        action_distribution = make_tanh_transformed(mean, std)
+        action_distribution = make_scaled_tanh_transformed(mean, std, self.scale, len(self.action_shape))
 
         return action_distribution
 
@@ -279,6 +283,7 @@ class SoftActorCritic(nn.Module):
         use_entropy_bonus: bool = False,
         temperature: float = 0.0,
         backup_entropy: bool = True,
+        action_scale: float = 1.0,
     ):
         super().__init__()
 
@@ -302,7 +307,9 @@ class SoftActorCritic(nn.Module):
         # Actor receives a dict of {focal_pts, tx_position, rx_position}
         # and outputs a distribution of "delta_focal_pts"
         # "delta_focal_pts" shape: (batch_size, num_devices, 2, 3)
-        self.actor = Actor(observation_shapes, action_shape).to(ptu.DEVICE)
+        self.actor = Actor(observation_shapes, action_shape, scale=action_scale).to(
+            ptu.DEVICE
+        )
         self.actor_optimizer = make_actor_optimizer(self.actor.parameters())
         self.actor_lr_scheduler = make_actor_schedule(self.actor_optimizer)
 
