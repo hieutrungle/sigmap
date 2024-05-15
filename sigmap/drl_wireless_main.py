@@ -105,7 +105,9 @@ def run_training_loop(
         # with timer.Timer(
         #     text="Elapsed env step time: {:0.4f} seconds\n", logger_fn=utils.logger.log
         # ):
-        # TODO: GPU memory leak in env, probably with Sionna
+        # ! TODO: GPU memory leak in env because of tensorflow persistent state
+        # ! may use subprocess to run env in separate process
+        # ! but this makes it difficult to debug and increase run time
         next_observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
         done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
