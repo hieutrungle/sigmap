@@ -43,6 +43,7 @@ def wireless_config(
     temperature: float = 0.1,
     actor_fixed_std: Optional[float] = None,
     use_tanh: bool = True,
+    action_scale=0.5,
 ):
     def make_critic(
         observation_shape: Tuple[int, ...], action_shape: Tuple[int, ...]
@@ -113,6 +114,7 @@ def wireless_config(
                 num_devices=args.num_devices,
                 num_tiles_per_device=args.num_tiles_per_device,
                 controlled_elements=args.controlled_elements,
+                action_scale=action_scale,
                 render_mode="rgb_array" if render else None,
             )
         )
@@ -168,6 +170,7 @@ def wireless_config(
                 if (soft_target_update_rate is not None)
                 else None
             ),
+            "action_scale": action_scale,
         },
         "replay_buffer_capacity": replay_buffer_capacity,
         "log_name": log_string,
