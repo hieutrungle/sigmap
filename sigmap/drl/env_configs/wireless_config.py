@@ -31,7 +31,7 @@ def wireless_config(
     target_update_period: Optional[int] = None,
     soft_target_update_rate: Optional[float] = None,
     # Actor-critic configuration
-    actor_gradient_type="reinforce",  # One of "reinforce" or "reparametrize"
+    actor_gradient_type="reparametrize",  # One of "reinforce" or "reparametrize"
     num_actor_samples: int = 1,
     num_critic_updates: int = 1,
     # Settings for multiple critics
@@ -44,6 +44,7 @@ def wireless_config(
     actor_fixed_std: Optional[float] = None,
     use_tanh: bool = True,
     action_scale=0.5,
+    num_train_steps_per_env_step=1,
 ):
     def make_critic(
         observation_shape: Tuple[int, ...], action_shape: Tuple[int, ...]
@@ -180,4 +181,5 @@ def wireless_config(
         "ep_len": ep_len,
         "batch_size": batch_size,
         "make_env": make_env,
+        "num_train_steps_per_env_step": num_train_steps_per_env_step,
     }

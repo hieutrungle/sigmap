@@ -130,24 +130,18 @@ def run_training_loop(
 
         # train agent
         if step > drl_config.training_starts:
-            batch = replay_buffer.sample(drl_config.batch_size)
-            batch = ptu.from_numpy(batch)
-            obs, actions, rewards, next_obs, dones = (
-                batch["observations"],
-                batch["actions"],
-                batch["rewards"],
-                batch["next_observations"],
-                batch["dones"],
-            )
-            dones = dones.long()
-            update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
-
-            obs = ptu.to_numpy(obs)
-            actions = ptu.to_numpy(actions)
-            rewards = ptu.to_numpy(rewards)
-            next_obs = ptu.to_numpy(next_obs)
-            dones = ptu.to_numpy(dones)
-            batch = ptu.to_numpy(batch)
+            for _ in range(drl_config.num_train_steps_per_env_step):
+                batch = replay_buffer.sample(drl_config.batch_size)
+                batch = ptu.from_numpy(batch)
+                obs, actions, rewards, next_obs, dones = (
+                    batch["observations"],
+                    batch["actions"],
+                    batch["rewards"],
+                    batch["next_observations"],
+                    batch["dones"],
+                )
+                dones = dones.long()
+                update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
             # logging
             # update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]

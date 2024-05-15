@@ -9,10 +9,10 @@ actor_learning_rate: 0.001
 critic_learning_rate: 0.001
 
 total_steps: 5000
-random_steps: 130
-training_starts: 130
+random_steps: 380
+training_starts: 380
 
-batch_size: 128
+batch_size: 256
 replay_buffer_capacity: 6000
 
 discount: 0.99
@@ -20,9 +20,12 @@ use_soft_target_update: true
 soft_target_update_rate: 0.005
 
 actor_gradient_type: reparametrize
-num_critic_updates: 1
+num_critic_updates: 5
 
 use_entropy_bonus: true
 temperature: 0.05
 
-action_scale: 0.5
+action_scale: 0.25
+
+# training parameters
+num_train_steps_per_env_step: 5
