@@ -17,7 +17,7 @@ def make_multi_normal(
 
 
 def make_tanh_transformed(
-    mean: torch.Tensor, std: Union[float, torch.Tensor]
+    mean: torch.Tensor, std: Union[float, torch.Tensor], event_dim: int = 1
 ) -> D.Distribution:
     if isinstance(std, float):
         std = torch.tensor(std, device=mean.device)
@@ -28,9 +28,33 @@ def make_tanh_transformed(
     return D.Independent(
         D.TransformedDistribution(
             base_distribution=D.Normal(mean, std),
-            transforms=[D.TanhTransform(cache_size=1), D.transforms.AffineTransform(0, 0.5)],
+            transforms=[D.TanhTransform(cache_size=1)],
         ),
-        reinterpreted_batch_ndims=3,
+        reinterpreted_batch_ndims=event_dim,
+    )
+
+
+def make_scaled_tanh_transformed(
+    mean: torch.Tensor,
+    std: Union[float, torch.Tensor],
+    scale: float = 1.0,
+    event_dim: int = 1,
+) -> D.Distribution:
+    if isinstance(std, float):
+        std = torch.tensor(std, device=mean.device)
+
+    if std.shape == ():
+        std = std.expand(mean.shape)
+
+    return D.Independent(
+        D.TransformedDistribution(
+            base_distribution=D.Normal(mean, std),
+            transforms=[
+                D.TanhTransform(cache_size=1),
+                D.transforms.AffineTransform(0, scale),
+            ],
+        ),
+        reinterpreted_batch_ndims=event_dim,
     )
 
 
