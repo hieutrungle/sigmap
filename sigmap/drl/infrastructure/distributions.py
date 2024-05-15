@@ -28,7 +28,7 @@ def make_tanh_transformed(
     return D.Independent(
         D.TransformedDistribution(
             base_distribution=D.Normal(mean, std),
-            transforms=[D.TanhTransform(cache_size=1)],
+            transforms=[D.TanhTransform(cache_size=1), D.transforms.AffineTransform(0, 0.5)],
         ),
         reinterpreted_batch_ndims=3,
     )
