@@ -25,12 +25,14 @@ class WirelessEnvV2(Env):
         num_devices,
         num_tiles_per_device,
         controlled_elements,
+        action_scale=1.0,
         **kwargs,
     ):
         super(WirelessEnvV2, self).__init__()
 
         self.current_time = "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
 
+        self.action_scale = action_scale
         self.num_devices = num_devices
         self.num_tiles_per_device = num_tiles_per_device
         self.controlled_elements = controlled_elements
@@ -75,7 +77,7 @@ class WirelessEnvV2(Env):
         # Action space
         # represent the delta x, y, z of the focal points
         self.action_space = spaces.Box(
-            -0.505, 0.505, shape=self.focal_pts_shape, dtype=np.float32
+            -self.action_scale , self.action_scale , shape=self.focal_pts_shape, dtype=np.float32
         )
 
         # State of all devices
