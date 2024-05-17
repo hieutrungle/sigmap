@@ -9,8 +9,8 @@ actor_learning_rate: 0.001
 critic_learning_rate: 0.001
 
 total_steps: 5000
-random_steps: 380
-training_starts: 380
+random_steps: 280
+training_starts: 280
 
 batch_size: 256
 replay_buffer_capacity: 6000
@@ -25,7 +25,7 @@ num_critic_updates: 5
 use_entropy_bonus: true
 temperature: 0.05
 
-action_scale: 0.25
+action_scale: 1.0
 
 # training parameters
 num_train_steps_per_env_step: 5
