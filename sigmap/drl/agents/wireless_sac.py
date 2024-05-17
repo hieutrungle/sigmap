@@ -152,7 +152,9 @@ class Actor(nn.Module):
         #     else:
         #         std = torch.nn.functional.softplus(self.std) + 1e-2
 
-        action_distribution = make_scaled_tanh_transformed(mean, std, self.scale, len(self.action_shape))
+        action_distribution = make_scaled_tanh_transformed(
+            mean, std, self.scale, len(self.action_shape)
+        )
 
         return action_distribution
 
@@ -307,6 +309,7 @@ class SoftActorCritic(nn.Module):
         # Actor receives a dict of {focal_pts, tx_position, rx_position}
         # and outputs a distribution of "delta_focal_pts"
         # "delta_focal_pts" shape: (batch_size, num_devices, 2, 3)
+        self.action_scale = action_scale
         self.actor = Actor(observation_shapes, action_shape, scale=action_scale).to(
             ptu.DEVICE
         )
