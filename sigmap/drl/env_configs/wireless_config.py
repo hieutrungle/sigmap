@@ -108,16 +108,14 @@ def wireless_config(
         )
 
     def make_env(render: bool = False):
-        return RecordEpisodeStatistics(
-            gym.make(
-                env_name,
-                sionna_config_file=args.sionna_config_file,
-                num_devices=args.num_devices,
-                num_tiles_per_device=args.num_tiles_per_device,
-                controlled_elements=args.controlled_elements,
-                action_scale=action_scale,
-                render_mode="rgb_array" if render else None,
-            )
+        return gym.make(
+            env_name,
+            sionna_config_file=args.sionna_config_file,
+            num_devices=args.num_devices,
+            num_tiles_per_device=args.num_tiles_per_device,
+            controlled_elements=args.controlled_elements,
+            action_scale=action_scale,
+            render_mode="rgb_array" if render else None,
         )
 
     log_string = "{}_{}_{}_s{}_l{}_alr{}_clr{}_b{}_d{}".format(

@@ -117,11 +117,11 @@ class WirelessEnvV2(Env):
         self._tx_positions = np.asarray(self._default_tx_positions, dtype=np.float32)
         self._rx_positions = np.asarray(self._default_rx_positions, dtype=np.float32)
 
-        # self.info = {"episode": {"r": 0, "l": 0}}
-        # self.info.update(
-        #     {"tx_positions": self._tx_positions, "rx_positions": self._rx_positions}
-        # )
-        return self._get_obs(), {}
+        self.info = {"episode": {"r": 0, "l": 0}}
+        self.info.update(
+            {"tx_positions": self._tx_positions, "rx_positions": self._rx_positions}
+        )
+        return self._get_obs(), self.info
 
     def step(
         self, action: np.ndarray, **kwargs
@@ -153,9 +153,9 @@ class WirelessEnvV2(Env):
         reward = self._cal_reward(self._focal_pts)
 
         # info
-        # self.info.update({"episode": {"r": reward, "l": self.ep_step}})
+        self.info.update({"episode": {"r": reward, "l": self.ep_step}})
 
-        return next_observation, reward, terminated, truncated, {}
+        return next_observation, reward, terminated, truncated, self.info
 
     def _cal_reward(self, focal_pts):
         """
