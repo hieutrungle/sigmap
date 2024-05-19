@@ -93,7 +93,7 @@ def run_training_loop(
 
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
         # accumulate data in replay buffer
-        if step < drl_config.random_steps // 2:
+        if step < drl_config.random_steps * 3 / 4:
             observation, info = env.reset()
             action = env.action_space.sample()
         elif step < drl_config.random_steps:
