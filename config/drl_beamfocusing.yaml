@@ -5,8 +5,8 @@ num_critic_networks: 2
 target_critic_backup_type: min
 exp_name: clipq
 env_name: wireless-sigmap-v2
-actor_learning_rate: 0.001
-critic_learning_rate: 0.001
+actor_learning_rate: 0.0007
+critic_learning_rate: 0.0007
 
 total_steps: 10000
 random_steps: 1000
