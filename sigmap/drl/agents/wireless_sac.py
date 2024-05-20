@@ -283,7 +283,7 @@ class SoftActorCritic(nn.Module):
         target_critic_backup_type: str = "mean",  # One of "doubleq", "min", "redq", or "mean"
         # Soft actor-critic
         use_entropy_bonus: bool = False,
-        temperature: float = 0.0,
+        temperature: float = 0.05,
         backup_entropy: bool = True,
         action_scale: float = 1.0,
     ):
@@ -332,6 +332,19 @@ class SoftActorCritic(nn.Module):
             ]
         )
 
+        self.alpha = nn.Parameter(
+            torch.tensor(
+                [temperature],
+                dtype=torch.float32,
+                requires_grad=True,
+                device=ptu.DEVICE,
+            )
+        )
+        self._alpha_min = 1e-4
+        self._alpha_max = 0.1
+        self.target_entropy = -np.prod(action_shape)
+        self.alpha_optimizer = torch.optim.Adam([self.alpha], lr=4e-4)
+
         self.observation_shapes = observation_shapes
         self.action_shape = action_shape
         self.discount = discount
@@ -339,7 +352,6 @@ class SoftActorCritic(nn.Module):
         self.target_critic_backup_type = target_critic_backup_type
         self.num_critic_networks = num_critic_networks
         self.use_entropy_bonus = use_entropy_bonus
-        self.temperature = temperature
         self.actor_gradient_type = actor_gradient_type
         self.num_actor_samples = num_actor_samples
         self.num_critic_updates = num_critic_updates
@@ -495,7 +507,7 @@ class SoftActorCritic(nn.Module):
                 # Add entropy bonus to the target values for SAC
                 # Make sure to use the temperature parameter!
                 # Hint: Make sure your entropy bonus has compatible dimensions! (Watch out for broadcasting)
-                next_actions_entropy = self.entropy(next_actions_distribution)
+                next_actions_entropy = self.calc_entropy(next_actions_distribution)
 
                 next_actions_entropy = (
                     next_actions_entropy[None]
@@ -505,7 +517,7 @@ class SoftActorCritic(nn.Module):
                 assert (
                     next_actions_entropy.shape == next_qs.shape
                 ), next_actions_entropy.shape
-                next_qs += self.temperature * next_actions_entropy
+                next_qs += self.alpha * next_actions_entropy
 
             # Compute target Q-values
             # rewards = (
@@ -559,7 +571,7 @@ class SoftActorCritic(nn.Module):
             "target_values": target_values.mean().item(),
         }
 
-    def entropy(self, action_distribution: torch.distributions.Distribution):
+    def calc_entropy(self, action_distribution: torch.distributions.Distribution):
         """
         Compute the (approximate) entropy of the action distribution for each batch element.
         """
@@ -605,7 +617,7 @@ class SoftActorCritic(nn.Module):
         log_probs = action_distribution.log_prob(actions)
         loss = -(log_probs * advantage).mean()
 
-        return loss, torch.mean(self.entropy(action_distribution))
+        return loss, torch.mean(self.calc_entropy(action_distribution))
 
     def actor_loss_reparametrize(
         self, observations: dict[torch.Tensor]
@@ -628,7 +640,7 @@ class SoftActorCritic(nn.Module):
         # q_values = self.run_critics(observations, actions).view(-1)
 
         loss = torch.mean(-q_values)
-        return loss, torch.mean(self.entropy(action_distribution))
+        return loss, torch.mean(self.calc_entropy(action_distribution))
         # return 0.0, 0.0
 
     def _replicate_observations(
@@ -654,13 +666,35 @@ class SoftActorCritic(nn.Module):
 
         # Add entropy if necessary
         if self.use_entropy_bonus:
-            loss = loss - self.temperature * entropy
+            loss = loss - self.alpha * entropy
 
         self.actor_optimizer.zero_grad()
         loss.backward()
         self.actor_optimizer.step()
 
         return {"actor_loss": loss.item(), "entropy": entropy.item()}
+
+    def update_alpha(self, observations: dict[torch.Tensor]):
+        """
+        Update the temperature parameter alpha.
+        """
+        if self.use_entropy_bonus:
+            with torch.no_grad():
+                action_distribution: torch.distributions.Distribution = self.actor(
+                    observations
+                )
+                entropy = self.calc_entropy(action_distribution)
+                entropy = torch.mean(entropy)
+            loss = self.alpha * (entropy - self.target_entropy)
+            loss = loss.mean()
+            self.alpha_optimizer.zero_grad()
+            loss.backward()
+            self.alpha_optimizer.step()
+
+            # self.alpha = self.alpha - self.alpha_lr * loss
+            self.alpha = torch.clamp(self.alpha, self._alpha_min, self._alpha_max)
+            return {"alpha": self.alpha.item()}
+        return {}
 
     def update_target_critics(self):
         """
@@ -726,6 +760,9 @@ class SoftActorCritic(nn.Module):
             k: np.mean([info[k] for info in critic_infos]) for k in critic_infos[0]
         }
 
+        # Update alpha
+        alpha_info = self.update_alpha(observations)
+
         # Deal with LR scheduling
         self.actor_lr_scheduler.step()
         self.critics_lr_scheduler.step()
@@ -733,6 +770,7 @@ class SoftActorCritic(nn.Module):
         return {
             **actor_info,
             **critic_info,
+            **alpha_info,
             "actor_lr": self.actor_lr_scheduler.get_last_lr()[0],
             "critics_lr": self.critics_lr_scheduler.get_last_lr()[0],
             "moving_average_reward": self.moving_average_reward,
@@ -747,6 +785,7 @@ class SoftActorCritic(nn.Module):
                 "step": step,
                 "actor": self.actor.state_dict(),
                 "critics": [critic.state_dict() for critic in self.critics],
+                "alpha": self.alpha.item(),
             },
             path,
         )
