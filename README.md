@@ -129,6 +129,7 @@ ffmpeg -framerate 5 -i {PATH_TO_IMAGES}_%05d.png -r 30 -pix_fmt yuv420p {OUTPUT_
 Example:
 
 ```bash
+ml GCCcore/12.3.0 FFmpeg/6.0
 ffmpeg -framerate 5 -i ./images/tmp_beamfocusing_simple_hallway/hallway_%05d.png -r 30 -pix_fmt yuv420p ./videos/beamfocusing_fr_5.mp4
 ```
 
