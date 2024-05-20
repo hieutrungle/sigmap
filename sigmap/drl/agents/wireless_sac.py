@@ -534,8 +534,8 @@ class SoftActorCritic(nn.Module):
             )
             advantages = self.dB2linear(advantages)
             next_qs = self.dB2linear(next_qs)
-            target_values: torch.Tensor = advantages + self.discount * next_qs * (
-                1 - 1.0 * dones
+            target_values: torch.Tensor = (
+                advantages + self.discount * (1 - 1.0 * dones) * next_qs
             )
             target_values = self.linear2dB(target_values)  # in dB
 
