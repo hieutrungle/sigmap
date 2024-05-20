@@ -99,12 +99,12 @@ def wireless_config(
         min_lr = max_lr / 50
         return CosineAnnealingWarmupRestarts(
             optimizer,
-            first_cycle_steps=int((total_steps * num_train_steps_per_env_step) // 2),
+            first_cycle_steps=int((total_steps * num_train_steps_per_env_step) // 6),
             cycle_mult=1.0,
             max_lr=max_lr,
             min_lr=min_lr,
-            warmup_steps=int((total_steps * num_train_steps_per_env_step) // 8),
-            gamma=1 / 4,
+            warmup_steps=int((total_steps * num_train_steps_per_env_step) // 32),
+            gamma=1 / 2,
         )
 
     def make_env(render: bool = False):
