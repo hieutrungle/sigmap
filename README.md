@@ -14,7 +14,7 @@ Moreover, it computes the optimal angle and position of the RIS elements to:
 Clone this repository and navigate to it in your terminal. Activate your environment. Then run:
 
 ```bash
-pip install -r requirements.txt -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install -r requirements.txt
 ```
 
 Install local sigmap package:
