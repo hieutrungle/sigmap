@@ -3,7 +3,7 @@ numpy
 setuptools
 sionna
 tensorflow[and-cuda]
-jax[cuda12_pip]
+jax[cuda12]
 PyYAML
 torch
 torchvision
