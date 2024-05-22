@@ -277,7 +277,10 @@ class WirelessEnvV2(Env):
         )
 
         sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
-        siona_script = os.path.join(sigmap_dir, "sigmap", "sub_tasks", "run_cmap.py")
+        # siona_script = os.path.join(sigmap_dir, "sigmap", "sub_tasks", "run_cmap.py")
+        siona_script = os.path.join(
+            sigmap_dir, "sigmap", "sub_tasks", "calc_pathgain.py"
+        )
         img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
         mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
             "mitsuba_filename"
@@ -296,7 +299,8 @@ class WirelessEnvV2(Env):
             viz_scene_path,
             "--saved_path",
             render_filename,
-            "--cmap_enabled",
+            # "--cmap_enabled",
+            "--paths_enabled",
         ]
         tmp_dir = utils.get_tmp_dir()
         sionna_output_txt = os.path.join(tmp_dir, "sionna_outputs.txt")
