@@ -191,6 +191,12 @@ def main():
     drl_config = scripting_utils.make_drl_config(args.drl_config_file, args)
     tsb_logger = scripting_utils.make_tensorboard_logger(drl_config)
 
+    devices = [d for d in range(torch.cuda.device_count())]
+    device_names = [torch.cuda.get_device_name(d) for d in devices]
+
+    for d, dn in zip(devices, device_names):
+        print(f"Device {d}: {dn}")
+
     run_training_loop(drl_config, tsb_logger, args)
 
 
