@@ -691,8 +691,7 @@ class SoftActorCritic(nn.Module):
             loss.backward()
             self.alpha_optimizer.step()
 
-            # self.alpha = self.alpha - self.alpha_lr * loss
-            self.alpha = torch.clamp(self.alpha, self._alpha_min, self._alpha_max)
+            self.alpha.data.clamp(self._alpha_min, self._alpha_max)
             return {"alpha": self.alpha.item()}
         return {}
 
