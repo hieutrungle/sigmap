@@ -111,8 +111,10 @@ def run_training_loop(
         next_observation, reward, terminated, truncated, info = env.step(action)
         if terminated:
             actions = next_observation["focal_pts"] - observation["focal_pts"]
+            print(f"Terminated at step {step}")
         done = terminated or truncated
         done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
+
         reward = np.array(reward, dtype=np.float32)
         done = np.array(done, dtype=np.float32)
         replay_buffer.insert(
