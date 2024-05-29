@@ -367,7 +367,7 @@ class SoftActorCritic(nn.Module):
         self._alpha_min = 1e-4
         self._alpha_max = 0.1
         self.target_entropy = -np.prod(action_shape)
-        self.alpha_optimizer = torch.optim.Adam([self.alpha], lr=4e-4)
+        self.alpha_optimizer = torch.optim.AdamW([self.alpha], lr=3e-4)
 
         self.observation_shapes = observation_shapes
         self.action_shape = action_shape

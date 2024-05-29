@@ -87,10 +87,10 @@ def wireless_config(
             )
 
     def make_actor_optimizer(params: torch.nn.ParameterList) -> torch.optim.Optimizer:
-        return torch.optim.Adam(params, lr=actor_learning_rate)
+        return torch.optim.AdamW(params, lr=actor_learning_rate)
 
     def make_critic_optimizer(params: torch.nn.ParameterList) -> torch.optim.Optimizer:
-        return torch.optim.Adam(params, lr=critic_learning_rate)
+        return torch.optim.AdamW(params, lr=critic_learning_rate)
 
     def make_lr_schedule(
         optimizer: torch.optim.Optimizer,
