@@ -20,9 +20,32 @@ _str_to_activation = {
     "leaky_relu": nn.LeakyReLU(),
     "sigmoid": nn.Sigmoid(),
     "selu": nn.SELU(),
+    "gelu": nn.GELU(),
     "softplus": nn.Softplus(),
     "identity": nn.Identity(),
 }
+
+
+class Fourier(nn.Module):
+    """
+
+    - From the paper: Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains
+
+    - From link: https://bmild.github.io/fourfeat/index.html
+
+    - From reddit implementatation: https://www.reddit.com/r/MachineLearning/comments/hc5q3g/r_fourier_features_let_networks_learn_high/
+
+    """
+
+    def __init__(self, input_size, nmb=256, scale=10):
+        super(Fourier, self).__init__()
+        self.b = torch.randn(input_size, nmb) * scale
+        self.b = torch.nn.Parameter(self.b, requires_grad=True)
+        self.pi = 3.14159265359
+
+    def forward(self, v):
+        x_proj = torch.matmul(2 * self.pi * v, self.b)
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], -1)
 
 
 class Actor(nn.Module):
@@ -30,7 +53,7 @@ class Actor(nn.Module):
         self,
         observation_shapes: Tuple[Sequence[int]],
         action_shape: Sequence[int],
-        n_layers: int = 5,
+        n_layers: int = 3,
         size: int = 128,
         activation: Activation = "tanh",
         output_activation: Activation = "identity",
@@ -54,11 +77,18 @@ class Actor(nn.Module):
         self.tx_position_shape = observation_shapes[1]
         self.rx_position_shape = observation_shapes[2]
 
+        self.focal_pts_flatten_len = np.prod(self.focal_pts_shape)
+        self.tx_position_flatten_len = np.prod(self.tx_position_shape)
+        self.rx_position_flatten_len = np.prod(self.rx_position_shape)
+
         n_lower_layers = n_layers // 3
         self.action_shape = action_shape
 
         # focal points
-        in_size = np.prod(self.focal_pts_shape)
+        input_size = np.prod(self.focal_pts_shape)
+        self.focal_pos_encoding = Fourier(input_size=input_size, nmb=size // 2)
+
+        in_size = 2 * (size // 2)
         upper_layers = []
         n_upper_layers = n_layers - n_lower_layers
         for _ in range(n_upper_layers):
@@ -68,7 +98,10 @@ class Actor(nn.Module):
         self.upper_block = nn.Sequential(*upper_layers)
 
         # tx_poxsition + rx_position
-        in_size = np.prod(self.tx_position_shape) + np.prod(self.rx_position_shape)
+        input_size = np.prod(self.tx_position_shape) + np.prod(self.rx_position_shape)
+        self.pos_encoding = Fourier(input_size=input_size, nmb=size // 2)
+
+        in_size = 2 * (size // 2)
         position_layers = []
         for _ in range(1):
             position_layers.append(nn.Linear(in_size, size))
@@ -86,27 +119,6 @@ class Actor(nn.Module):
         lower_layers.append(nn.Linear(in_size, np.prod(self.action_shape) * 2))
         lower_layers.append(output_activation)
         self.lower_block = nn.Sequential(*lower_layers)
-
-        self.focal_pts_flatten_len = np.prod(self.focal_pts_shape)
-        self.tx_position_flatten_len = np.prod(self.tx_position_shape)
-        self.rx_position_flatten_len = np.prod(self.rx_position_shape)
-
-        # if self.state_dependent_std:
-        #     lower_layers.append(nn.Linear(in_size, np.prod(action_shape) * 2))
-        # else:
-        #     lower_layers.append(nn.Linear(in_size, np.prod(action_shape)))
-
-        # if self.fixed_std:
-        #     self.std = 0.1
-        # else:
-        #     self.std = nn.Parameter(
-        #         torch.full(
-        #             (np.prod(action_shape),),
-        #             0.0,
-        #             dtype=torch.float32,
-        #             device=ptu.DEVICE,
-        #         )
-        #     )
 
     def forward(self, observations: dict) -> torch.distributions.Distribution:
 
@@ -127,8 +139,11 @@ class Actor(nn.Module):
             self.rx_position_flatten_len,
         )
 
-        focal = self.upper_block(focal_pts)
-        positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=-1))
+        focal = self.focal_pos_encoding(focal_pts)
+        focal = self.upper_block(focal)
+
+        positions = self.pos_encoding(torch.cat([tx_positions, rx_positions], dim=-1))
+        positions = self.position_block(positions)
         # Combine the two blocks
         # if self.state_dependent_std: means shape: (batch_size, 2 * ac_dim)
         # else: means shape: (batch_size, ac_dim)
@@ -164,9 +179,9 @@ class Critic(nn.Module):
         self,
         observation_shapes: Tuple[Sequence[int]],
         action_shape: Sequence[int],
-        n_layers: int = 5,
+        n_layers: int = 3,
         size: int = 128,
-        activation: Activation = "tanh",
+        activation: Activation = "gelu",
         output_activation: Activation = "identity",
     ):
         super().__init__()
@@ -181,10 +196,20 @@ class Critic(nn.Module):
         self.rx_position_shape = observation_shapes[2]
         self.action_shape = action_shape
 
+        self.focal_pts_flatten_len = np.prod(self.focal_pts_shape)
+        self.tx_position_flatten_len = np.prod(self.tx_position_shape)
+        self.rx_position_flatten_len = np.prod(self.rx_position_shape)
+        self.action_flatten_len = np.prod(self.action_shape)
+
         n_lower_layers = n_layers // 3
 
         # focal points
-        in_size = np.prod(self.focal_pts_shape) + np.prod(self.action_shape)
+        # in_size = np.prod(self.focal_pts_shape) + np.prod(self.action_shape)
+        input_size = np.prod(self.focal_pts_shape) + np.prod(self.action_shape)
+        self.focal_pos_encoding = Fourier(input_size=input_size, nmb=size // 2)
+
+        in_size = 2 * (size // 2)
+
         upper_layers = []
         n_upper_layers = n_layers - n_lower_layers
         for _ in range(n_upper_layers):
@@ -194,7 +219,10 @@ class Critic(nn.Module):
         self.upper_block = nn.Sequential(*upper_layers)
 
         # tx_poxsition + rx_position
-        in_size = np.prod(self.tx_position_shape) + np.prod(self.rx_position_shape)
+        input_size = np.prod(self.tx_position_shape) + np.prod(self.rx_position_shape)
+        self.pos_encoding = Fourier(input_size=input_size, nmb=size // 2)
+
+        in_size = 2 * (size // 2)
         position_layers = []
         for _ in range(1):
             position_layers.append(nn.Linear(in_size, size))
@@ -212,11 +240,6 @@ class Critic(nn.Module):
         lower_layers.append(nn.Linear(in_size, 1))
         lower_layers.append(output_activation)
         self.lower_block = nn.Sequential(*lower_layers)
-
-        self.focal_pts_flatten_len = np.prod(self.focal_pts_shape)
-        self.tx_position_flatten_len = np.prod(self.tx_position_shape)
-        self.rx_position_flatten_len = np.prod(self.rx_position_shape)
-        self.action_flatten_len = np.prod(self.action_shape)
 
     def forward(
         self,
@@ -245,9 +268,10 @@ class Critic(nn.Module):
             *actions.shape[: -len(self.action_shape)], self.action_flatten_len
         )
 
-        mixed = torch.cat([focal_pts, actions], dim=-1)
+        mixed = self.focal_pos_encoding(torch.cat([focal_pts, actions], dim=-1))
         mixed = self.upper_block(mixed)
-        positions = self.position_block(torch.cat([tx_positions, rx_positions], dim=-1))
+        positions = self.pos_encoding(torch.cat([tx_positions, rx_positions], dim=-1))
+        positions = self.position_block(positions)
         combined = torch.cat([mixed, positions], dim=-1)
         q_values = self.lower_block(combined)
 
@@ -563,6 +587,7 @@ class SoftActorCritic(nn.Module):
         critics_loss: torch.Tensor = self.critic_loss(q_values, target_values)
         self.critics_optimizer.zero_grad()
         critics_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.critics.parameters(), 1.0)
         self.critics_optimizer.step()
 
         return {
@@ -670,6 +695,8 @@ class SoftActorCritic(nn.Module):
 
         self.actor_optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
+
         self.actor_optimizer.step()
 
         return {"actor_loss": loss.item(), "entropy": entropy.item()}
