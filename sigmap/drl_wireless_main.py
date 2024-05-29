@@ -109,6 +109,8 @@ def run_training_loop(
         # ! may use subprocess to run env in separate process
         # ! but this makes it difficult to debug and increase run time
         next_observation, reward, terminated, truncated, info = env.step(action)
+        if terminated:
+            actions = next_observation["focal_pts"] - observation["focal_pts"]
         done = terminated or truncated
         done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
         reward = np.array(reward, dtype=np.float32)

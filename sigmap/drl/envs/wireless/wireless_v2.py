@@ -129,10 +129,6 @@ class WirelessEnvV2(Env):
 
         # next observation
         self._focal_pts = self._focal_pts + action
-        self._focal_pts = np.clip(
-            self._focal_pts, self.focal_pts_low, self.focal_pts_high
-        )
-        next_observation = self._get_obs()
 
         # termination
         # Check if self._focal_pts is out of bounds
@@ -141,6 +137,12 @@ class WirelessEnvV2(Env):
             self._focal_pts > self.focal_pts_high
         ):
             terminated = True
+
+        # clip the focal points to the bounds
+        self._focal_pts = np.clip(
+            self._focal_pts, self.focal_pts_low, self.focal_pts_high
+        )
+        next_observation = self._get_obs()
 
         # truncation
         self.ep_step += 1
