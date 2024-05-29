@@ -260,3 +260,19 @@ def linear2dB(x: float) -> float:
 
 def dB2linear(x: float) -> float:
     return float(10 ** (x / 10))
+
+
+def cartesian2spherical(x: float, y: float, z: float) -> Tuple[float, float, float]:
+    r = np.sqrt(x**2 + y**2 + z**2)
+    theta = np.arccos(z / r)
+    phi = np.arctan2(y, x)
+    return r, theta, phi
+
+
+def spherical2cartesian(
+    r: float, theta: float, phi: float
+) -> Tuple[float, float, float]:
+    x = r * np.sin(theta) * np.cos(phi)
+    y = r * np.sin(theta) * np.sin(phi)
+    z = r * np.cos(theta)
+    return x, y, z
