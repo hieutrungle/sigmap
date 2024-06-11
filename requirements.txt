@@ -13,3 +13,4 @@ tqdm
 tensorboard
 tensorboardX
 gymnasium
+distrax
