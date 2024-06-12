@@ -200,6 +200,7 @@ class SoftActorCritic:
         num_critics: int = 2,
         num_critic_updates: int = 5,
         target_critic_backup_type: int = 1,
+        alpha: float = 0.05,  # temperature for entropy
         seed: int = 0,
     ):
         super().__init__()
@@ -213,6 +214,7 @@ class SoftActorCritic:
         self.num_critics = num_critics
         self.num_critic_updates = num_critic_updates
         self.target_critic_backup_type = target_critic_backup_type
+        self.alpha = alpha
         self.seed = seed
 
         self.key = random.PRNGKey(self.seed)
@@ -352,7 +354,7 @@ class SoftActorCritic:
 
         return next_qs
 
-    @functools.partial(jax.jit, static_argnums=(2, 4))
+    # @functools.partial(jax.jit, static_argnums=(2, 4))
     def calc_critic_loss(
         self,
         list_critic_params: list[struct.PyTreeNode],
@@ -379,11 +381,15 @@ class SoftActorCritic:
             next_actions,
         )
         next_q_values = self.do_q_backup(next_q_values)
+        next_action_entropy = self.calc_entropy(
+            actor_state.params, actor_state.apply_fn, next_observations, next_actions
+        )
+        next_action_entropy = self._expand_repeat(next_action_entropy, self.num_critics)
+        next_q_values = next_q_values + self.alpha * next_action_entropy
 
-        rewards = jnp.expand_dims(rewards, axis=0)
-        rewards = jnp.repeat(rewards, self.num_critics, axis=0)
-        dones = jnp.expand_dims(dones, axis=0)
-        dones = jnp.repeat(dones, self.num_critics, axis=0)
+        rewards = self._expand_repeat(rewards, self.num_critics)
+        dones = self._expand_repeat(dones, self.num_critics)
+
         target_q_values = rewards + self.discount * (1 - dones) * next_q_values
 
         q_values = self.run_critics(
@@ -394,7 +400,12 @@ class SoftActorCritic:
 
         return loss
 
-    @functools.partial(jax.jit, static_argnums=(2, 4))
+    def _expand_repeat(self, x, num_repeats):
+        x = jnp.expand_dims(x, axis=0)
+        x = jnp.repeat(x, num_repeats, axis=0)
+        return x
+
+    # @functools.partial(jax.jit, static_argnums=(2, 4))
     def calc_critic_loss_grad(
         self,
         list_critic_params: list[struct.PyTreeNode],
@@ -431,6 +442,31 @@ class SoftActorCritic:
             critic_states[i] = critic_state.apply_gradients(grads=grads[i])
 
         return critic_states
+
+    @functools.partial(jax.jit, static_argnums=(2))
+    def calc_entropy(
+        self,
+        actor_params: struct.PyTreeNode,
+        actor_apply_fn: Callable,
+        observations: dict[str, np.ndarray],
+        actions: np.ndarray,
+    ):
+        """
+        Compute the (approximate) entropy of the action distribution for each batch element.
+        """
+        means, log_stds = actor_apply_fn(actor_params, observations)
+
+        actions = jnp.arctanh(actions)
+
+        # TODO: this is not correct, need to compute the log probability of the actions with batch shape and event shape
+        log_probs = jax.scipy.stats.norm.logpdf(
+            actions, loc=means, scale=jnp.exp(log_stds)
+        )
+
+        entropy_est = -jnp.mean(
+            log_probs, axis=np.arange(1, len(self.action_shape) + 1)
+        )
+        return entropy_est
 
     def update_critics(
         self,
@@ -519,6 +555,7 @@ class SoftActorCritic:
             self.num_critics,
             self.num_critic_updates,
             self.target_critic_backup_type,
+            self.alpha,
             self.seed,
         )
         # arrays / dynamic values
