@@ -208,6 +208,7 @@ class SoftActorCritic:
         hidden_sizes: Sequence[int],
         actor_learning_rate: float,
         critic_learning_rate: float,
+        alpha_learning_rate: float,
         discount: float,
         tau: float,
         num_critics: int = 2,
@@ -223,6 +224,7 @@ class SoftActorCritic:
         self.hidden_sizes = hidden_sizes
         self.actor_learning_rate = actor_learning_rate
         self.critic_learning_rate = critic_learning_rate
+        self.alpha_learning_rate = alpha_learning_rate
         self.discount = discount
         self.tau = tau
         self.num_critics = num_critics
@@ -241,7 +243,7 @@ class SoftActorCritic:
         # Alpha
         self.target_entropy = -np.prod(action_shape)
         alpha = Alpha()
-        alpha_opt = optax.adamw(self.actor_learning_rate)
+        alpha_opt = optax.adamw(self.alpha_learning_rate)
         self.alpha_state = train_state.TrainState.create(
             apply_fn=alpha.apply,
             params=alpha.init(self.key, jnp.array(self.temperature).reshape(1, 1)),
@@ -681,7 +683,6 @@ class SoftActorCritic:
             )
             critic_infos.append(info)
 
-        # actor_info = {}
         actor_info = self.update_actor(observations)
 
         self.soft_update_target_critics(self.tau)
@@ -716,6 +717,7 @@ class SoftActorCritic:
             self.hidden_sizes,
             self.actor_learning_rate,
             self.critic_learning_rate,
+            self.alpha_learning_rate,
             self.discount,
             self.tau,
             self.num_critics,
