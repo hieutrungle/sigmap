@@ -1,25 +1,20 @@
 from typing import Callable, Optional, Tuple, Sequence, Union
-import copy
 import numpy as np
-import timeit
 
 import jax
 from jax import lax, random, numpy as jnp
 from flax import core, struct
-import flax
 from flax.core import freeze, unfreeze
 from flax import linen as nn  # nn notation also used in PyTorch and in Flax's older API
 from flax.training import train_state  # a useful dataclass to keep train state
-from jax import tree_util
 
 # JAX optimizers - a separate lib developed by DeepMind
 import optax
 
 import functools
-from jax.tree_util import register_pytree_node_class
 from dataclasses import dataclass
-import time
-import time
+
+from sigmap.drl import distributions as D
 
 Activation = Union[str, Callable]
 
@@ -111,7 +106,10 @@ class Actor(nn.Module):
 
         means = means.reshape((*means.shape[:-1], *self.action_shape))
         log_stds = log_stds.reshape((*log_stds.shape[:-1], *self.action_shape))
-        return means, log_stds
+        dist = D.Normal(means, jnp.exp(log_stds))
+        dist = D.Transformed(dist, D.Tanh())
+        dist = D.Independent(dist, reinterpreted_batch_ndims=len(self.action_shape))
+        return dist
 
 
 class Critic(nn.Module):
@@ -169,6 +167,19 @@ class Critic(nn.Module):
         return x
 
 
+class Alpha(nn.Module):
+    """
+    Temperature parameter for entropy.
+    """
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        x = nn.Dense(1)(x)
+        x = jnp.mean(x)
+        x = jnp.clip(x, 0.0001, 0.1)
+        return x
+
+
 @jax.tree_util.register_pytree_node_class
 @dataclass
 class SoftActorCritic:
@@ -186,6 +197,8 @@ class SoftActorCritic:
     num_critics: int = 2
     num_critic_updates: int = 5
     target_critic_backup_type: int = 1
+    temperature: float = 0.05  # temperature for entropy
+    num_actor_samples: int = 5
     seed: int = 0
 
     def __init__(
@@ -200,7 +213,8 @@ class SoftActorCritic:
         num_critics: int = 2,
         num_critic_updates: int = 5,
         target_critic_backup_type: int = 1,
-        alpha: float = 0.05,  # temperature for entropy
+        temperature: float = 0.05,  # temperature for entropy
+        num_actor_samples: int = 5,
         seed: int = 0,
     ):
         super().__init__()
@@ -214,7 +228,8 @@ class SoftActorCritic:
         self.num_critics = num_critics
         self.num_critic_updates = num_critic_updates
         self.target_critic_backup_type = target_critic_backup_type
-        self.alpha = alpha
+        self.temperature = temperature
+        self.num_actor_samples = num_actor_samples
         self.seed = seed
 
         self.key = random.PRNGKey(self.seed)
@@ -223,18 +238,30 @@ class SoftActorCritic:
             tmp_observations[key] = jax.random.normal(self.key, (1, *shape))
         tmp_actions = jax.random.normal(self.key, (1, *self.action_shape))
 
-        self.actor = Actor(
+        # Alpha
+        self.target_entropy = -np.prod(action_shape)
+        alpha = Alpha()
+        alpha_opt = optax.adamw(self.actor_learning_rate)
+        self.alpha_state = train_state.TrainState.create(
+            apply_fn=alpha.apply,
+            params=alpha.init(self.key, jnp.array(self.temperature).reshape(1, 1)),
+            tx=alpha_opt,
+        )
+
+        # Actor
+        actor = Actor(
             observation_shapes=self.observation_shapes,
             action_shape=self.action_shape,
             hidden_sizes=self.hidden_sizes,
         )
         actor_opt = optax.adamw(self.actor_learning_rate)
         self.actor_state = train_state.TrainState.create(
-            apply_fn=self.actor.apply,
-            params=self.actor.init(self.key, tmp_observations),
+            apply_fn=actor.apply,
+            params=actor.init(self.key, tmp_observations),
             tx=actor_opt,
         )
 
+        # Critics
         critics = [
             Critic(
                 observation_shapes=self.observation_shapes,
@@ -285,6 +312,7 @@ class SoftActorCritic:
                 step=self.target_critic_states[i].step + 1, params=new_target_params
             )
 
+    @functools.partial(jax.jit, static_argnums=(2))
     def run_critics(
         self,
         list_critic_params: list[struct.PyTreeNode],
@@ -308,32 +336,6 @@ class SoftActorCritic:
         q_values = jnp.concatenate(q_values, axis=0)
         return q_values
 
-    @functools.partial(jax.jit, static_argnums=(2))
-    def get_actions(
-        self,
-        actor_params: struct.PyTreeNode,
-        actor_apply_fn: Callable,
-        observations: dict[str, np.ndarray],
-        key: jax.random.PRNGKey,
-    ) -> np.ndarray:
-        """
-        Get actions from the agent's actor network.
-        """
-        means, log_stds = actor_apply_fn(actor_params, observations)
-        actions = jax.random.normal(key, means.shape) * jnp.exp(log_stds) + means
-        # take tanh transform to ensure action is in [-1, 1]
-        actions = jnp.tanh(actions)
-        return actions
-
-    def calc_actor_loss(
-        self, actor_params, actor_apply_fn, critic_state, observations, key
-    ):
-        actions = self.get_actions(actor_params, actor_apply_fn, observations, key)
-        q_values = critic_state.apply_fn(critic_state.params, observations, actions)
-
-        loss = -jnp.mean(q_values)
-        return loss
-
     def do_q_backup(self, next_qs: jnp.ndarray):
         """
         Handle Q-values from multiple different target critic networks to produce target values.
@@ -354,7 +356,7 @@ class SoftActorCritic:
 
         return next_qs
 
-    # @functools.partial(jax.jit, static_argnums=(2, 4))
+    @functools.partial(jax.jit, static_argnums=(2, 4))
     def calc_critic_loss(
         self,
         list_critic_params: list[struct.PyTreeNode],
@@ -362,18 +364,20 @@ class SoftActorCritic:
         list_target_critic_params: list[struct.PyTreeNode],
         list_target_critic_apply_fn: Tuple[Callable],
         actor_state: train_state.TrainState,
+        alpha_state: train_state.TrainState,
         observations: dict[str, np.ndarray],
         actions: np.ndarray,
         rewards: np.ndarray,
         next_observations: dict[str, np.ndarray],
         dones: np.ndarray,
+        key: jax.random.PRNGKey,
     ):
-        next_actions = self.get_actions(
-            actor_state.params,
-            actor_state.apply_fn,
-            next_observations,
-            self.key,
+
+        # Target Q-values
+        next_action_distribution: D.Distribution = actor_state.apply_fn(
+            actor_state.params, next_observations
         )
+        next_actions = next_action_distribution.sample(seed=key)
         next_q_values = self.run_critics(
             list_target_critic_params,
             list_target_critic_apply_fn,
@@ -381,15 +385,21 @@ class SoftActorCritic:
             next_actions,
         )
         next_q_values = self.do_q_backup(next_q_values)
-        next_action_entropy = self.calc_entropy(
-            actor_state.params, actor_state.apply_fn, next_observations, next_actions
-        )
-        next_action_entropy = self._expand_repeat(next_action_entropy, self.num_critics)
-        next_q_values = next_q_values + self.alpha * next_action_entropy
 
+        # Entropy
+        next_action_entropy = self.calc_entropy(next_action_distribution, key)
+        next_action_entropy = self._expand_repeat(next_action_entropy, self.num_critics)
+        alpha = alpha_state.apply_fn(
+            alpha_state.params, jnp.array(self.temperature).reshape(1, 1)
+        )
+
+        next_q_values = next_q_values + alpha * next_action_entropy
+
+        # Expand rewards and dones to match the number of critics
         rewards = self._expand_repeat(rewards, self.num_critics)
         dones = self._expand_repeat(dones, self.num_critics)
 
+        # Loss
         target_q_values = rewards + self.discount * (1 - dones) * next_q_values
 
         q_values = self.run_critics(
@@ -398,38 +408,43 @@ class SoftActorCritic:
 
         loss = jnp.mean((q_values - target_q_values) ** 2)
 
-        return loss
+        return loss, next_action_entropy
 
     def _expand_repeat(self, x, num_repeats):
         x = jnp.expand_dims(x, axis=0)
         x = jnp.repeat(x, num_repeats, axis=0)
         return x
 
-    # @functools.partial(jax.jit, static_argnums=(2, 4))
+    @functools.partial(jax.jit, static_argnums=(2, 4))
     def calc_critic_loss_grad(
         self,
         list_critic_params: list[struct.PyTreeNode],
         list_critic_apply_fn: Tuple[Callable],
         list_target_critic_params: list[struct.PyTreeNode],
         list_target_critic_apply_fn: Tuple[Callable],
-        observations,
-        actions,
-        rewards,
-        next_observations,
-        dones,
+        actor_state: train_state.TrainState,
+        alpha_state: train_state.TrainState,
+        observations: dict[str, np.ndarray],
+        actions: np.ndarray,
+        rewards: np.ndarray,
+        next_observations: dict[str, np.ndarray],
+        dones: np.ndarray,
+        key: jax.random.PRNGKey,
     ):
-        grad_fn = jax.value_and_grad(self.calc_critic_loss)
+        grad_fn = jax.value_and_grad(self.calc_critic_loss, has_aux=True)
         return grad_fn(
             list_critic_params,
             list_critic_apply_fn,
             list_target_critic_params,
             list_target_critic_apply_fn,
-            self.actor_state,
+            actor_state,
+            alpha_state,
             observations,
             actions,
             rewards,
             next_observations,
             dones,
+            key,
         )
 
     @jax.jit
@@ -443,29 +458,21 @@ class SoftActorCritic:
 
         return critic_states
 
-    @functools.partial(jax.jit, static_argnums=(2))
+    @jax.jit
     def calc_entropy(
         self,
-        actor_params: struct.PyTreeNode,
-        actor_apply_fn: Callable,
-        observations: dict[str, np.ndarray],
-        actions: np.ndarray,
+        action_distribution: D.Distribution,
+        key: jax.random.PRNGKey,
     ):
         """
         Compute the (approximate) entropy of the action distribution for each batch element.
         """
-        means, log_stds = actor_apply_fn(actor_params, observations)
-
-        actions = jnp.arctanh(actions)
-
-        # TODO: this is not correct, need to compute the log probability of the actions with batch shape and event shape
-        log_probs = jax.scipy.stats.norm.logpdf(
-            actions, loc=means, scale=jnp.exp(log_stds)
+        samples = action_distribution.sample(
+            seed=key, sample_shape=(self.num_actor_samples,)
         )
+        log_probs = action_distribution.log_prob(samples)
 
-        entropy_est = -jnp.mean(
-            log_probs, axis=np.arange(1, len(self.action_shape) + 1)
-        )
+        entropy_est = -jnp.mean(log_probs, axis=0)
         return entropy_est
 
     def update_critics(
@@ -483,25 +490,176 @@ class SoftActorCritic:
         target_critic_apply_fns = tuple(
             [critic.apply_fn for critic in self.target_critic_states]
         )
-        loss, grads = self.calc_critic_loss_grad(
+        (loss, entropy), grads = self.calc_critic_loss_grad(
             [critic.params for critic in self.critic_states],
             critic_apply_fns,
             [critic.params for critic in self.target_critic_states],
             target_critic_apply_fns,
+            self.actor_state,
+            self.alpha_state,
             observations,
             actions,
             rewards,
             next_observations,
             dones,
+            self.key,
         )
         self.critic_states = self.apply_grad_critics(grads, self.critic_states)
-        return {"loss": loss}
+        return {"critic loss": loss, "critic entropy": entropy}
+
+    @functools.partial(jax.jit, static_argnums=(2))
+    def calc_actor_loss(
+        self,
+        actor_params: struct.PyTreeNode,
+        actor_apply_fn: Callable,
+        critic_states: train_state.TrainState,
+        alpha_state: train_state.TrainState,
+        observations: dict[str, np.ndarray],
+        key: jax.random.PRNGKey,
+    ):
+        # Q-values
+        action_distribution: D.Distribution = actor_apply_fn(actor_params, observations)
+        actions = action_distribution.sample(
+            seed=key, sample_shape=(self.num_actor_samples,)
+        )
+
+        rep_observations = self._replicate_observations(
+            observations, self.num_actor_samples
+        )
+
+        # shape: (num_critics, num_actor_samples, batch_size)
+        q_values = self.run_critics(
+            [critic_state.params for critic_state in critic_states],
+            tuple([critic_state.apply_fn for critic_state in critic_states]),
+            rep_observations,
+            actions,
+        )
+
+        # Alpha
+        alpha = alpha_state.apply_fn(
+            alpha_state.params, jnp.array(self.temperature).reshape(1, 1)
+        )
+
+        # Loss
+        entropy = self.calc_entropy(action_distribution, key)
+        entropy = jnp.mean(entropy)
+        loss = -jnp.mean(q_values) - alpha * entropy
+
+        return loss, (entropy, alpha)
+
+    def _replicate_observations(
+        self,
+        observations: dict[str, np.ndarray],
+        num_repeats: int,
+    ):
+        """
+        Replicate the observations to match the number of replicas.
+        """
+        rep_observations = {}
+        for key, value in observations.items():
+            rep_observations[key] = self._expand_repeat(value, num_repeats)
+        return rep_observations
+
+    @functools.partial(jax.jit, static_argnums=(2))
+    def calc_actor_loss_grad(
+        self,
+        actor_params: struct.PyTreeNode,
+        actor_apply_fn: Callable,
+        critic_states: train_state.TrainState,
+        alpha_state: train_state.TrainState,
+        observations: dict[str, np.ndarray],
+        key: jax.random.PRNGKey,
+    ):
+        grad_fn = jax.value_and_grad(self.calc_actor_loss, has_aux=True)
+        return grad_fn(
+            actor_params, actor_apply_fn, critic_states, alpha_state, observations, key
+        )
 
     def update_actor(
         self,
         observations: dict[str, np.ndarray],
     ):
-        return {}
+        (loss, (entropy, alpha)), grads = self.calc_actor_loss_grad(
+            self.actor_state.params,
+            self.actor_state.apply_fn,
+            self.critic_states,
+            self.alpha_state,
+            observations,
+            self.key,
+        )
+        self.actor_state = self.actor_state.apply_gradients(grads=grads)
+        return {
+            "actor loss": loss,
+            "actor entropy": entropy,
+            "alpha": alpha,
+        }
+
+    def calc_alpha_loss(
+        self,
+        alpha_params: struct.PyTreeNode,
+        alpha_apply_fn: Callable,
+        actor_state: train_state.TrainState,
+        temperature: np.ndarray,
+        target_entropy: np.ndarray,
+        observations: dict[str, np.ndarray],
+        key: jax.random.PRNGKey,
+    ):
+        """
+        Update the temperature parameter alpha.
+        """
+        # Q-values
+        action_distribution: D.Distribution = actor_state.apply_fn(
+            actor_state.params, observations
+        )
+
+        # Loss
+        alpha = alpha_apply_fn(alpha_params, jnp.array(temperature).reshape(1, 1))
+
+        entropy = self.calc_entropy(action_distribution, key)
+        entropy = jnp.mean(entropy)
+        loss = jnp.mean(alpha * (entropy - target_entropy))
+
+        return loss, alpha
+
+    @functools.partial(jax.jit, static_argnums=(2))
+    def calc_alpha_loss_grad(
+        self,
+        alpha_params: struct.PyTreeNode,
+        alpha_apply_fn: Callable,
+        actor_state: train_state.TrainState,
+        temperature: np.ndarray,
+        target_entropy: np.ndarray,
+        observations: dict[str, np.ndarray],
+        key: jax.random.PRNGKey,
+    ):
+        grad_fn = jax.value_and_grad(self.calc_alpha_loss, has_aux=True)
+        return grad_fn(
+            alpha_params,
+            alpha_apply_fn,
+            actor_state,
+            temperature,
+            target_entropy,
+            observations,
+            key,
+        )
+
+    def update_alpha(self, observations: dict[str, np.ndarray]):
+        """
+        Update the temperature parameter alpha.
+        """
+        # Q-values
+        (loss, alpha), grads = self.calc_alpha_loss_grad(
+            self.alpha_state.params,
+            self.alpha_state.apply_fn,
+            self.actor_state,
+            np.array(self.temperature),
+            np.array(self.target_entropy),
+            observations,
+            self.key,
+        )
+
+        self.alpha_state = self.alpha_state.apply_gradients(grads=grads)
+        return {"alpha loss": loss, "alpha": alpha}
 
     def update(
         self,
@@ -523,9 +681,12 @@ class SoftActorCritic:
             )
             critic_infos.append(info)
 
+        # actor_info = {}
         actor_info = self.update_actor(observations)
 
         self.soft_update_target_critics(self.tau)
+
+        alpha_info = self.update_alpha(observations)
 
         critic_info = {
             k: np.mean([info[k] for info in critic_infos]) for k in critic_infos[0]
@@ -534,7 +695,7 @@ class SoftActorCritic:
         return {
             **actor_info,
             **critic_info,
-            # **alpha_info,
+            **alpha_info,
             # "actor_lr": self.actor_lr_scheduler.get_last_lr()[0],
             # "critics_lr": self.critics_lr_scheduler.get_last_lr()[0],
             # "moving_average_reward": self.moving_average_reward,
@@ -543,6 +704,11 @@ class SoftActorCritic:
     def tree_flatten(self):
         # first group (if it's non-hashable/dynamic)
         # or the second group (if it's hashable/static)
+
+        # arrays / dynamic values
+        # children = (self.actor_state, self.critic_states, self.target_critic_states)
+        children = tuple([])
+
         # static values
         aux_data = (
             self.observation_shapes,
@@ -555,19 +721,12 @@ class SoftActorCritic:
             self.num_critics,
             self.num_critic_updates,
             self.target_critic_backup_type,
-            self.alpha,
+            self.temperature,
+            self.num_actor_samples,
             self.seed,
         )
-        # arrays / dynamic values
-        # children = (self.actor_state, self.critic_states, self.target_critic_states)
-        children = tuple([])
         return children, aux_data
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
         return cls(*children, *aux_data)
-
-
-# tree_util.register_pytree_node_class(
-#     SoftActorCritic, SoftActorCritic.tree_flatten, SoftActorCritic.tree_unflatten
-# )
