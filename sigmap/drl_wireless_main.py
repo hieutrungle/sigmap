@@ -1,29 +1,19 @@
 import time
 import os
-import glob
-import re
-import subprocess
 import argparse
 
 gpu_num = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"  # to avoid memory fragmentation
+# os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".10"
 
-from sigmap.drl.agents.wireless_sac import SoftActorCritic
+from sigmap.drl.agents.wireless_sac_jax import SoftActorCritic
 from sigmap.drl.infrastructure.replay_buffer import WirelessReplayBuffer
-from sigmap.drl.infrastructure.data_types import Observations
-
-# import sigmap.drl.env_configs
-
-import os
-import time
 
 import gymnasium as gym
-from gymnasium import wrappers
 import numpy as np
-import torch
-from sigmap.drl.infrastructure import pytorch_utils as ptu
 import tqdm
 
 from sigmap.drl.infrastructure.logger import TensorboardLogger
@@ -44,12 +34,9 @@ def run_training_loop(
 ):
     # set random seeds
     np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    ptu.init_gpu(use_gpu=not args.no_gpu, gpu_id=args.which_gpu)
 
     if args.verbose:
         utils.log_args(args)
-        # utils.log_config(sionna_config)
         utils.log_config(drl_config)
 
     env = drl_config.make_env()
@@ -67,13 +54,13 @@ def run_training_loop(
         fps = env.env.metadata["render_fps"]
 
     ob_space = env.observation_space
-    ob_shapes = []
-    for key in ob_space.keys():
-        ob_shapes.append(ob_space[key].shape)
-    ob_shapes = tuple(ob_shapes)
+    ob_shapes = {}
+    for k, v in ob_space.spaces.items():
+        ob_shapes[k] = v.shape
     ac_space = env.action_space
     ac_shape = ac_space.shape
-    agent = SoftActorCritic(
+
+    agent = SoftActorCritic.create(
         ob_shapes,
         ac_shape,
         **drl_config.agent_kwargs,
@@ -136,7 +123,6 @@ def run_training_loop(
         if step > drl_config.training_starts:
             for _ in range(drl_config.num_train_steps_per_env_step):
                 batch = replay_buffer.sample(drl_config.batch_size)
-                batch = ptu.from_numpy(batch)
                 obs, actions, rewards, next_obs, dones = (
                     batch["observations"],
                     batch["actions"],
@@ -144,7 +130,6 @@ def run_training_loop(
                     batch["next_observations"],
                     batch["dones"],
                 )
-                dones = dones.long()
                 update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
             # logging
@@ -158,13 +143,8 @@ def run_training_loop(
 
             if train_return > best_return:
                 best_return = train_return
-                saved_dir = os.path.join(assets_dir, f"saved_models")
-                utils.mkdir_not_exists(saved_dir)
-                saved_path = os.path.join(
-                    saved_dir, f"{drl_config.log_name}_best_model.pt"
-                )
-                agent.save(saved_path, step)
-
+                agent.save(step)
+    agent.wait_for_checkpoint()
     return
 
 
@@ -194,12 +174,6 @@ def main():
     # sionna_config = scripting_utils.make_sionna_config(args.sionna_config_file)
     drl_config = scripting_utils.make_drl_config(args.drl_config_file, args)
     tsb_logger = scripting_utils.make_tensorboard_logger(drl_config)
-
-    devices = [d for d in range(torch.cuda.device_count())]
-    device_names = [torch.cuda.get_device_name(d) for d in devices]
-
-    for d, dn in zip(devices, device_names):
-        print(f"Device {d}: {dn}")
 
     run_training_loop(drl_config, tsb_logger, args)
 
