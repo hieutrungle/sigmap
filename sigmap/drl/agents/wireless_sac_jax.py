@@ -1,16 +1,27 @@
-from typing import Callable, Optional, Tuple, Sequence, Union
+from typing import Callable, Optional, Tuple, Sequence, Union, Any
+import os
+from jax._src.typing import Array
+from jax._src import dtypes
+
+KeyArray = Array
+DTypeLikeFloat = Any
+DTypeLikeComplex = Any
+DTypeLikeInexact = Any  # DTypeLikeFloat | DTypeLikeComplex
+
 import numpy as np
 
 import jax
 from jax import lax, random, numpy as jnp
-from flax import core, struct
-from flax.core import freeze, unfreeze
+from flax import struct
+from jax._src import core
 from flax import linen as nn  # nn notation also used in PyTorch and in Flax's older API
-from flax.training import train_state  # a useful dataclass to keep train state
+
+from flax.training import train_state
+import orbax.checkpoint as ocp
+from flax.training import orbax_utils
 
 # JAX optimizers - a separate lib developed by DeepMind
 import optax
-
 import functools
 from dataclasses import dataclass
 
@@ -58,7 +69,7 @@ class Actor(nn.Module):
 
     observation_shapes: dict[str, Sequence[int]]
     action_shape: Sequence[int]
-    hidden_sizes: Sequence[int]
+    hidden_sizes: Sequence[int] = (128, 128, 128)
     activation: Activation = "tanh"
     output_activation: Activation = "identity"
 
@@ -87,9 +98,11 @@ class Actor(nn.Module):
         )
 
         focals = Fourier(num_features=self.hidden_sizes[0] // 2)(focal_pts)
+        skip_focals = nn.Dense(self.hidden_sizes[:-1])(focals)
         for hidden_size in self.hidden_sizes[:-1]:
             focals = nn.Dense(hidden_size)(focals)
             focals = _str_to_activation[self.activation](focals)
+        focals = skip_focals + focals
 
         positions = jnp.concatenate([tx_positions, rx_positions], axis=-1)
         positions = Fourier(num_features=self.hidden_sizes[0] // 2)(positions)
@@ -117,7 +130,7 @@ class Critic(nn.Module):
 
     observation_shapes: dict[str, Sequence[int]]
     action_shape: Sequence[int]
-    hidden_sizes: Sequence[int]
+    hidden_sizes: Sequence[int] = (128, 128, 128)
     activation: Activation = "gelu"
     output_activation: Activation = "identity"
 
@@ -149,9 +162,11 @@ class Critic(nn.Module):
 
         mixed = jnp.concatenate([focal_pts, actions], axis=-1)
         mixed = Fourier(num_features=self.hidden_sizes[0] // 2)(mixed)
+        skip_mixed = nn.Dense(self.hidden_sizes[:-1])(mixed)
         for hidden_size in self.hidden_sizes[:-1]:
             mixed = nn.Dense(hidden_size)(mixed)
             mixed = _str_to_activation[self.activation](mixed)
+        mixed = skip_mixed + mixed
 
         positions = jnp.concatenate([tx_positions, rx_positions], axis=-1)
         positions = Fourier(num_features=self.hidden_sizes[0] // 2)(positions)
@@ -167,14 +182,43 @@ class Critic(nn.Module):
         return x
 
 
+def alpha_init(
+    key: KeyArray,
+    shape: core.Shape,
+    temperature: float,
+    dtype: DTypeLikeInexact = jnp.float_,
+) -> Array:
+    """An initializer that returns a constant array full of ones.
+
+    The ``key`` argument is ignored.
+
+    >>> import jax, jax.numpy as jnp
+    >>> jax.nn.initializers.ones(jax.random.key(42), (3, 2), jnp.float32)
+    Array([[1., 1.],
+           [1., 1.],
+           [1., 1.]], dtype=float32)
+    """
+    return jnp.ones(shape, dtypes.canonicalize_dtype(dtype)) * temperature
+
+
 class Alpha(nn.Module):
     """
     Temperature parameter for entropy.
     """
 
+    temperature: float = 0.05
+    alpha_init: Callable = alpha_init
+
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-        x = nn.Dense(1)(x)
+        alpha = self.param(
+            "alpha",  # parametar name (as it will appear in the FrozenDict)
+            self.alpha_init,  # initialization function, RNG passed implicitly through init fn
+            (x.shape[-1], 1),
+            self.temperature,
+        )  # shape info
+
+        x = jnp.dot(x, alpha)
         x = jnp.mean(x)
         x = jnp.clip(x, 0.0001, 0.1)
         return x
@@ -187,112 +231,144 @@ class SoftActorCritic:
     Soft Actor-Critic agent.
     """
 
-    observation_shapes: dict[str, Sequence[int]]
-    action_shape: Sequence[int]
-    hidden_sizes: Sequence[int]
-    actor_learning_rate: float
-    critic_learning_rate: float
-    discount: float
-    tau: float
+    actor_state: train_state.TrainState
+    critic_states: list[train_state.TrainState]
+    target_critic_states: list[train_state.TrainState]
+    alpha_state: train_state.TrainState
+    key: jax.random.PRNGKey
+    discount: float = 0.99
+    tau: float = 0.005
     num_critics: int = 2
     num_critic_updates: int = 5
-    target_critic_backup_type: int = 1
-    temperature: float = 0.05  # temperature for entropy
+    target_entropy: float = -10.0
     num_actor_samples: int = 5
-    seed: int = 0
+    checkpoint_manager: ocp.CheckpointManager = None
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         observation_shapes: dict[str, Sequence[int]],
         action_shape: Sequence[int],
-        hidden_sizes: Sequence[int],
-        actor_learning_rate: float,
-        critic_learning_rate: float,
-        alpha_learning_rate: float,
-        discount: float,
-        tau: float,
+        hidden_sizes: Sequence[int] = (128, 128, 128),
+        actor_learning_rate: float = 3e-4,
+        critic_learning_rate: float = 3e-4,
+        alpha_learning_rate: float = 1e-4,
+        discount: float = 0.99,
+        tau: float = 0.005,  # soft target update rate
         num_critics: int = 2,
         num_critic_updates: int = 5,
-        target_critic_backup_type: int = 1,
         temperature: float = 0.05,  # temperature for entropy
         num_actor_samples: int = 5,
+        saved_path: Optional[str] = None,
         seed: int = 0,
     ):
-        super().__init__()
-        self.observation_shapes = observation_shapes
-        self.action_shape = action_shape
-        self.hidden_sizes = hidden_sizes
-        self.actor_learning_rate = actor_learning_rate
-        self.critic_learning_rate = critic_learning_rate
-        self.alpha_learning_rate = alpha_learning_rate
-        self.discount = discount
-        self.tau = tau
-        self.num_critics = num_critics
-        self.num_critic_updates = num_critic_updates
-        self.target_critic_backup_type = target_critic_backup_type
-        self.temperature = temperature
-        self.num_actor_samples = num_actor_samples
-        self.seed = seed
-
-        self.key = random.PRNGKey(self.seed)
+        key = random.PRNGKey(seed)
         tmp_observations = {}
-        for key, shape in self.observation_shapes.items():
-            tmp_observations[key] = jax.random.normal(self.key, (1, *shape))
-        tmp_actions = jax.random.normal(self.key, (1, *self.action_shape))
+        for k, shape in observation_shapes.items():
+            tmp_observations[k] = jax.random.normal(key, (1, *shape))
+        tmp_actions = jax.random.normal(key, (1, *action_shape))
 
         # Alpha
-        self.target_entropy = -np.prod(action_shape)
-        alpha = Alpha()
-        alpha_opt = optax.adamw(self.alpha_learning_rate)
-        self.alpha_state = train_state.TrainState.create(
+        target_entropy = -np.prod(action_shape)
+        alpha = Alpha(temperature=temperature)
+        alpha_opt = optax.adamw(alpha_learning_rate)
+        alpha_state = train_state.TrainState.create(
             apply_fn=alpha.apply,
-            params=alpha.init(self.key, jnp.array(self.temperature).reshape(1, 1)),
+            params=alpha.init(key, jnp.array(1.0).reshape(1, 1)),
             tx=alpha_opt,
         )
 
         # Actor
         actor = Actor(
-            observation_shapes=self.observation_shapes,
-            action_shape=self.action_shape,
-            hidden_sizes=self.hidden_sizes,
+            observation_shapes=observation_shapes,
+            action_shape=action_shape,
+            hidden_sizes=hidden_sizes,
         )
-        actor_opt = optax.adamw(self.actor_learning_rate)
-        self.actor_state = train_state.TrainState.create(
+        actor_opt = optax.adamw(actor_learning_rate)
+        actor_state = train_state.TrainState.create(
             apply_fn=actor.apply,
-            params=actor.init(self.key, tmp_observations),
+            params=actor.init(key, tmp_observations),
             tx=actor_opt,
         )
 
         # Critics
         critics = [
             Critic(
-                observation_shapes=self.observation_shapes,
-                action_shape=self.action_shape,
-                hidden_sizes=self.hidden_sizes,
+                observation_shapes=observation_shapes,
+                action_shape=action_shape,
+                hidden_sizes=hidden_sizes,
             )
-            for _ in range(self.num_critics)
+            for _ in range(num_critics)
         ]
-        critic_opt = optax.adamw(self.critic_learning_rate)
-        self.critic_states = []
-        self.target_critic_states = []
+        critic_opt = optax.adamw(critic_learning_rate)
+        critic_states = []
+        target_critic_states = []
         for critic in critics:
-            self.key, subkey = random.split(self.key)
+            key, subkey = random.split(key)
+            params = critic.init(subkey, tmp_observations, tmp_actions)
             critic_state = train_state.TrainState.create(
                 apply_fn=critic.apply,
-                params=critic.init(subkey, tmp_observations, tmp_actions),
+                params=params,
                 tx=critic_opt,
             )
             target_critic_state = train_state.TrainState(
                 step=0,
                 apply_fn=critic.apply,
-                params=critic.init(subkey, tmp_observations, tmp_actions),
+                params=params,
                 tx=None,
                 opt_state=None,
             )
-            self.critic_states.append(critic_state)
-            self.target_critic_states.append(target_critic_state)
+            critic_states.append(critic_state)
+            target_critic_states.append(target_critic_state)
 
-        self.update_target_critics()
+        # checkpoint orbax
+        if saved_path is None:
+            saved_path = "./tmp/sac"
+            # get absolute path
+        saved_path = os.path.abspath(saved_path)
+        options = ocp.CheckpointManagerOptions(max_to_keep=5, create=True)
+        orbax_checkpointer = ocp.StandardCheckpointer()
+        checkpoint_manager = ocp.CheckpointManager(
+            saved_path,
+            # orbax_checkpointer,
+            options=options,
+        )
+
+        return cls(
+            actor_state,
+            critic_states,
+            target_critic_states,
+            alpha_state,
+            key,
+            discount,
+            tau,
+            num_critics,
+            num_critic_updates,
+            target_entropy,
+            num_actor_samples,
+            checkpoint_manager,
+        )
+
+    @jax.jit
+    def _get_action(
+        self,
+        observation: dict[np.ndarray],
+        actor_state: train_state.TrainState,
+        key: jax.random.PRNGKey,
+    ) -> np.ndarray:
+        rep_observation = self._replicate_observations(observation, num_repeats=1)
+        action_distribution: D.Distribution = actor_state.apply_fn(
+            actor_state.params, rep_observation
+        )
+        action = action_distribution.sample(seed=key)
+        return jnp.squeeze(action, axis=0)
+
+    def get_action(self, observation: dict[np.ndarray]) -> np.ndarray:
+        """
+        Compute an action for a given observation.
+        """
+        action = self._get_action(observation, self.actor_state, self.key)
+        return np.array(action)
 
     def update_target_critics(self):
         """
@@ -300,19 +376,25 @@ class SoftActorCritic:
         """
         self.soft_update_target_critics(1.0)
 
-    def soft_update_target_critics(self, tau):
+    def soft_update_target_critics(
+        self,
+        tau: float,
+        target_critic_states: list[train_state.TrainState],
+        critic_states: list[train_state.TrainState],
+    ):
         """
         Update target critics with moving average of current critics.
         """
-        for i, critic_state in enumerate(self.critic_states):
+        for i, critic_state in enumerate(critic_states):
             new_target_params = jax.tree.map(
                 lambda x, y: (1 - tau) * x + y * tau,
-                self.target_critic_states[i].params,
+                target_critic_states[i].params,
                 critic_state.params,
             )
-            self.target_critic_states[i] = self.target_critic_states[i].replace(
-                step=self.target_critic_states[i].step + 1, params=new_target_params
+            target_critic_states[i] = target_critic_states[i].replace(
+                step=target_critic_states[i].step + 1, params=new_target_params
             )
+        return target_critic_states
 
     @functools.partial(jax.jit, static_argnums=(2))
     def run_critics(
@@ -355,7 +437,6 @@ class SoftActorCritic:
         next_qs = jnp.min(next_qs, axis=0)
         next_qs = jnp.expand_dims(next_qs, axis=0)
         next_qs = jnp.repeat(next_qs, self.num_critics, axis=0)
-
         return next_qs
 
     @functools.partial(jax.jit, static_argnums=(2, 4))
@@ -391,18 +472,23 @@ class SoftActorCritic:
         # Entropy
         next_action_entropy = self.calc_entropy(next_action_distribution, key)
         next_action_entropy = self._expand_repeat(next_action_entropy, self.num_critics)
-        alpha = alpha_state.apply_fn(
-            alpha_state.params, jnp.array(self.temperature).reshape(1, 1)
-        )
+        alpha = alpha_state.apply_fn(alpha_state.params, jnp.array(1.0).reshape(1, 1))
 
         next_q_values = next_q_values + alpha * next_action_entropy
 
+        lower_bound = -100.0  # dB
+        # lower_bound = 0
+        advantages = rewards - lower_bound
+
         # Expand rewards and dones to match the number of critics
-        rewards = self._expand_repeat(rewards, self.num_critics)
+        advantages = self._expand_repeat(advantages, self.num_critics)
         dones = self._expand_repeat(dones, self.num_critics)
 
         # Loss
-        target_q_values = rewards + self.discount * (1 - dones) * next_q_values
+        advantages = self.dB2linear(advantages)
+        next_q_values = self.dB2linear(next_q_values)
+        target_q_values = advantages + self.discount * (1 - dones) * next_q_values
+        target_q_values = self.linear2dB(target_q_values)
 
         q_values = self.run_critics(
             list_critic_params, list_critic_apply_fn, observations, actions
@@ -410,7 +496,7 @@ class SoftActorCritic:
 
         loss = jnp.mean((q_values - target_q_values) ** 2)
 
-        return loss, next_action_entropy
+        return loss, (next_action_entropy, next_q_values)
 
     def _expand_repeat(self, x, num_repeats):
         x = jnp.expand_dims(x, axis=0)
@@ -492,7 +578,7 @@ class SoftActorCritic:
         target_critic_apply_fns = tuple(
             [critic.apply_fn for critic in self.target_critic_states]
         )
-        (loss, entropy), grads = self.calc_critic_loss_grad(
+        (loss, (entropy, next_q_values)), grads = self.calc_critic_loss_grad(
             [critic.params for critic in self.critic_states],
             critic_apply_fns,
             [critic.params for critic in self.target_critic_states],
@@ -507,7 +593,11 @@ class SoftActorCritic:
             self.key,
         )
         self.critic_states = self.apply_grad_critics(grads, self.critic_states)
-        return {"critic loss": loss, "critic entropy": entropy}
+        return {
+            "critic loss": loss,
+            "critic entropy": entropy,
+            "next_q_values": next_q_values,
+        }
 
     @functools.partial(jax.jit, static_argnums=(2))
     def calc_actor_loss(
@@ -538,9 +628,7 @@ class SoftActorCritic:
         )
 
         # Alpha
-        alpha = alpha_state.apply_fn(
-            alpha_state.params, jnp.array(self.temperature).reshape(1, 1)
-        )
+        alpha = alpha_state.apply_fn(alpha_state.params, jnp.array(1.0).reshape(1, 1))
 
         # Loss
         entropy = self.calc_entropy(action_distribution, key)
@@ -601,7 +689,6 @@ class SoftActorCritic:
         alpha_params: struct.PyTreeNode,
         alpha_apply_fn: Callable,
         actor_state: train_state.TrainState,
-        temperature: np.ndarray,
         target_entropy: np.ndarray,
         observations: dict[str, np.ndarray],
         key: jax.random.PRNGKey,
@@ -615,7 +702,7 @@ class SoftActorCritic:
         )
 
         # Loss
-        alpha = alpha_apply_fn(alpha_params, jnp.array(temperature).reshape(1, 1))
+        alpha = alpha_apply_fn(alpha_params, jnp.array(1.0).reshape(1, 1))
 
         entropy = self.calc_entropy(action_distribution, key)
         entropy = jnp.mean(entropy)
@@ -629,7 +716,6 @@ class SoftActorCritic:
         alpha_params: struct.PyTreeNode,
         alpha_apply_fn: Callable,
         actor_state: train_state.TrainState,
-        temperature: np.ndarray,
         target_entropy: np.ndarray,
         observations: dict[str, np.ndarray],
         key: jax.random.PRNGKey,
@@ -639,7 +725,6 @@ class SoftActorCritic:
             alpha_params,
             alpha_apply_fn,
             actor_state,
-            temperature,
             target_entropy,
             observations,
             key,
@@ -654,14 +739,16 @@ class SoftActorCritic:
             self.alpha_state.params,
             self.alpha_state.apply_fn,
             self.actor_state,
-            np.array(self.temperature),
-            np.array(self.target_entropy),
+            self.target_entropy,
             observations,
             self.key,
         )
 
         self.alpha_state = self.alpha_state.apply_gradients(grads=grads)
-        return {"alpha loss": loss, "alpha": alpha}
+        return {
+            "alpha loss": loss,
+            "new_alpha": self.alpha_state.params["params"]["alpha"].mean(),
+        }
 
     def update(
         self,
@@ -681,11 +768,14 @@ class SoftActorCritic:
             info = self.update_critics(
                 observations, actions, rewards, next_observations, dones
             )
+            self.target_critic_states = self.soft_update_target_critics(
+                self.tau, self.target_critic_states, self.critic_states
+            )
+
             critic_infos.append(info)
 
         actor_info = self.update_actor(observations)
-
-        self.soft_update_target_critics(self.tau)
+        # actor_info = {}
 
         alpha_info = self.update_alpha(observations)
 
@@ -702,33 +792,60 @@ class SoftActorCritic:
             # "moving_average_reward": self.moving_average_reward,
         }
 
+    def save(self, step: int):
+        """
+        Save the agent's parameters to a file.
+        """
+        self.checkpoint_manager.save(step, args=ocp.args.StandardSave(self))
+
+    def wait_for_checkpoint(self):
+        """
+        Wait for the checkpoint manager to finish writing checkpoints.
+        """
+        self.checkpoint_manager.wait_until_finished()
+
+    def load(self, step: int = None):
+        """
+        Load the agent's parameters from a file.
+        """
+        if step == None:
+            step = self.checkpoint_manager.best_step()
+        return self.checkpoint_manager.restore(
+            step, args=ocp.args.StandardRestore(self)
+        )
+
     def tree_flatten(self):
         # first group (if it's non-hashable/dynamic)
         # or the second group (if it's hashable/static)
 
         # arrays / dynamic values
         # children = (self.actor_state, self.critic_states, self.target_critic_states)
-        children = tuple([])
+        children = (
+            self.actor_state,
+            self.critic_states,
+            self.target_critic_states,
+            self.alpha_state,
+        )
 
         # static values
         aux_data = (
-            self.observation_shapes,
-            self.action_shape,
-            self.hidden_sizes,
-            self.actor_learning_rate,
-            self.critic_learning_rate,
-            self.alpha_learning_rate,
+            self.key,
             self.discount,
             self.tau,
             self.num_critics,
             self.num_critic_updates,
-            self.target_critic_backup_type,
-            self.temperature,
+            self.target_entropy,
             self.num_actor_samples,
-            self.seed,
+            self.checkpoint_manager,
         )
         return children, aux_data
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
         return cls(*children, *aux_data)
+
+    def linear2dB(self, x):
+        return 10 * jnp.log10(x)
+
+    def dB2linear(self, x):
+        return jnp.power(10, x / 10)
