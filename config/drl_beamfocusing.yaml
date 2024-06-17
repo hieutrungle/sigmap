@@ -1,31 +1,27 @@
 base_config: wireless
 
-# Use clipped double-Q learning (from TD3)
-num_critic_networks: 2
-target_critic_backup_type: min
-exp_name: clipq
+exp_name: sac_beamforming
 env_name: wireless-sigmap-v2
-actor_learning_rate: 0.0007
-critic_learning_rate: 0.0007
 
-total_steps: 10000
-random_steps: 1000
-training_starts: 1100
-
-batch_size: 256
 replay_buffer_capacity: 10500
+total_steps: 10000
+random_steps: 260
+training_starts: 260
 
-discount: 0.99
-use_soft_target_update: true
-soft_target_update_rate: 0.005
-
-actor_gradient_type: reparametrize
-num_critic_updates: 5
-
-use_entropy_bonus: true
-temperature: 0.05
-
-action_scale: 1.0
-
-# training parameters
+# Training settings
+actor_learning_rate: 0.0003
+actor_learning_rate: 0.0003
+critic_learning_rate: 0.0003
+batch_size: 256
 num_train_steps_per_env_step: 5
+
+# Actor-critic configuration
+hidden_sizes: [128, 128, 128, 128]
+discount: 0.99
+tau: 0.005 # soft_target_update_rate
+num_critics: 2
+num_critic_updates: 5
+temperature: 0.05
+num_actor_samples: 10
+saved_path: "./assets/saved_models/sac_beamforming"
+seed: 0
