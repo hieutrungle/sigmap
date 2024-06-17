@@ -98,7 +98,7 @@ class Actor(nn.Module):
         )
 
         focals = Fourier(num_features=self.hidden_sizes[0] // 2)(focal_pts)
-        skip_focals = nn.Dense(self.hidden_sizes[:-1])(focals)
+        skip_focals = nn.Dense(self.hidden_sizes[-2])(focals)
         for hidden_size in self.hidden_sizes[:-1]:
             focals = nn.Dense(hidden_size)(focals)
             focals = _str_to_activation[self.activation](focals)
@@ -162,7 +162,7 @@ class Critic(nn.Module):
 
         mixed = jnp.concatenate([focal_pts, actions], axis=-1)
         mixed = Fourier(num_features=self.hidden_sizes[0] // 2)(mixed)
-        skip_mixed = nn.Dense(self.hidden_sizes[:-1])(mixed)
+        skip_mixed = nn.Dense(self.hidden_sizes[-2])(mixed)
         for hidden_size in self.hidden_sizes[:-1]:
             mixed = nn.Dense(hidden_size)(mixed)
             mixed = _str_to_activation[self.activation](mixed)
@@ -477,7 +477,7 @@ class SoftActorCritic:
         next_q_values = next_q_values + alpha * next_action_entropy
 
         lower_bound = -100.0  # dB
-        # lower_bound = 0
+        lower_bound = 0
         advantages = rewards - lower_bound
 
         # Expand rewards and dones to match the number of critics
