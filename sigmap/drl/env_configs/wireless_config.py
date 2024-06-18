@@ -30,7 +30,7 @@ def wireless_config(
     # Actor-critic configuration
     hidden_sizes: Sequence[int] = [128, 128, 128],
     discount: float = 0.99,
-    tau: float = 0.005,  # soft target update rate
+    ema_decay: float = 0.995,  # soft target update rate
     num_critics: int = 2,
     num_critic_updates: int = 5,
     temperature: float = 0.05,  # temperature for entropy
@@ -68,7 +68,7 @@ def wireless_config(
             render_mode="rgb_array" if render else None,
         )
 
-    log_string = "{}_{}_s{}_alr{}_clr{}_alr{}_b{}_d{}".format(
+    log_string = "{}_{}_s{}_aclr{}_crlr{}_allr{}_b{}_d{}".format(
         exp_name or "offpolicy_ac",
         env_name,
         hidden_sizes,
@@ -79,8 +79,12 @@ def wireless_config(
         discount,
     )
 
-    log_string += f"_t{temperature}"
-    log_string += f"_stu{tau}"  # soft_target_update_rate
+    log_string += f"_tem{temperature}"
+    log_string += f"_stu{ema_decay}"  # soft_target_update_rate
+
+    num_train_steps = int(
+        (total_steps - training_starts) * num_train_steps_per_env_step
+    )
 
     return {
         "agent_kwargs": {
@@ -88,8 +92,9 @@ def wireless_config(
             "actor_learning_rate": actor_learning_rate,
             "critic_learning_rate": critic_learning_rate,
             "alpha_learning_rate": alpha_learning_rate,
+            "num_train_steps": num_train_steps,
             "discount": discount,
-            "tau": tau,
+            "ema_decay": ema_decay,
             "num_critics": num_critics,
             "num_critic_updates": num_critic_updates,
             "temperature": temperature,
