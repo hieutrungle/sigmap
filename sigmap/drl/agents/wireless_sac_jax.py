@@ -237,7 +237,7 @@ class SoftActorCritic:
     alpha_state: train_state.TrainState
     key: jax.random.PRNGKey
     discount: float = 0.99
-    tau: float = 0.005
+    ema_decay: float = 0.995
     num_critics: int = 2
     num_critic_updates: int = 5
     target_entropy: float = -10.0
@@ -253,8 +253,9 @@ class SoftActorCritic:
         actor_learning_rate: float = 3e-4,
         critic_learning_rate: float = 3e-4,
         alpha_learning_rate: float = 1e-4,
+        num_train_steps: int = None,
         discount: float = 0.99,
-        tau: float = 0.005,  # soft target update rate
+        ema_decay: float = 0.995,  # soft target update rate
         num_critics: int = 2,
         num_critic_updates: int = 5,
         temperature: float = 0.05,  # temperature for entropy
@@ -268,10 +269,35 @@ class SoftActorCritic:
             tmp_observations[k] = jax.random.normal(key, (1, *shape))
         tmp_actions = jax.random.normal(key, (1, *action_shape))
 
+        @optax.inject_hyperparams
+        def chain_optimizer(learning_rate: float):
+            return optax.chain(
+                optax.clip(1.0), optax.adamw(learning_rate=learning_rate)
+            )
+
+        def create_optimizer(
+            learning_rate: float, num_train_steps: int = None
+        ) -> optax.GradientTransformation:
+            init_value = learning_rate / 50
+            end_value = learning_rate / 10
+            if num_train_steps == None:
+                num_train_steps = 1_000
+            warmup_steps = num_train_steps // 5
+            decay_steps = num_train_steps
+            schedule = optax.warmup_cosine_decay_schedule(
+                init_value=init_value,
+                peak_value=learning_rate,
+                warmup_steps=warmup_steps,
+                decay_steps=decay_steps,
+                end_value=end_value,
+            )
+            optimizer = chain_optimizer(learning_rate=schedule)
+            return optimizer
+
         # Alpha
         target_entropy = -np.prod(action_shape)
         alpha = Alpha(temperature=temperature)
-        alpha_opt = optax.adamw(alpha_learning_rate)
+        alpha_opt = create_optimizer(alpha_learning_rate, num_train_steps)
         alpha_state = train_state.TrainState.create(
             apply_fn=alpha.apply,
             params=alpha.init(key, jnp.array(1.0).reshape(1, 1)),
@@ -284,7 +310,7 @@ class SoftActorCritic:
             action_shape=action_shape,
             hidden_sizes=hidden_sizes,
         )
-        actor_opt = optax.adamw(actor_learning_rate)
+        actor_opt = create_optimizer(actor_learning_rate, num_train_steps)
         actor_state = train_state.TrainState.create(
             apply_fn=actor.apply,
             params=actor.init(key, tmp_observations),
@@ -300,7 +326,9 @@ class SoftActorCritic:
             )
             for _ in range(num_critics)
         ]
-        critic_opt = optax.adamw(critic_learning_rate)
+        critic_opt = create_optimizer(
+            critic_learning_rate, int(num_train_steps * num_critic_updates)
+        )
         critic_states = []
         target_critic_states = []
         for critic in critics:
@@ -341,7 +369,7 @@ class SoftActorCritic:
             alpha_state,
             key,
             discount,
-            tau,
+            ema_decay,
             num_critics,
             num_critic_updates,
             target_entropy,
@@ -376,9 +404,10 @@ class SoftActorCritic:
         """
         self.soft_update_target_critics(1.0)
 
+    @functools.partial(jax.jit, static_argnums=(1))
     def soft_update_target_critics(
         self,
-        tau: float,
+        ema_decay: float,
         target_critic_states: list[train_state.TrainState],
         critic_states: list[train_state.TrainState],
     ):
@@ -386,10 +415,10 @@ class SoftActorCritic:
         Update target critics with moving average of current critics.
         """
         for i, critic_state in enumerate(critic_states):
+            old = target_critic_states[i].params
+            new = critic_state.params
             new_target_params = jax.tree.map(
-                lambda x, y: (1 - tau) * x + y * tau,
-                target_critic_states[i].params,
-                critic_state.params,
+                lambda x, y: (1 - ema_decay) * x + y * ema_decay, new, old
             )
             target_critic_states[i] = target_critic_states[i].replace(
                 step=target_critic_states[i].step + 1, params=new_target_params
@@ -476,7 +505,7 @@ class SoftActorCritic:
 
         next_q_values = next_q_values + alpha * next_action_entropy
 
-        lower_bound = -100.0  # dB
+        # lower_bound = -90.0  # dB
         lower_bound = 0
         advantages = rewards - lower_bound
 
@@ -496,55 +525,12 @@ class SoftActorCritic:
 
         loss = jnp.mean((q_values - target_q_values) ** 2)
 
-        return loss, (next_action_entropy, next_q_values)
+        return loss, (next_action_entropy, q_values, next_q_values)
 
     def _expand_repeat(self, x, num_repeats):
         x = jnp.expand_dims(x, axis=0)
         x = jnp.repeat(x, num_repeats, axis=0)
         return x
-
-    @functools.partial(jax.jit, static_argnums=(2, 4))
-    def calc_critic_loss_grad(
-        self,
-        list_critic_params: list[struct.PyTreeNode],
-        list_critic_apply_fn: Tuple[Callable],
-        list_target_critic_params: list[struct.PyTreeNode],
-        list_target_critic_apply_fn: Tuple[Callable],
-        actor_state: train_state.TrainState,
-        alpha_state: train_state.TrainState,
-        observations: dict[str, np.ndarray],
-        actions: np.ndarray,
-        rewards: np.ndarray,
-        next_observations: dict[str, np.ndarray],
-        dones: np.ndarray,
-        key: jax.random.PRNGKey,
-    ):
-        grad_fn = jax.value_and_grad(self.calc_critic_loss, has_aux=True)
-        return grad_fn(
-            list_critic_params,
-            list_critic_apply_fn,
-            list_target_critic_params,
-            list_target_critic_apply_fn,
-            actor_state,
-            alpha_state,
-            observations,
-            actions,
-            rewards,
-            next_observations,
-            dones,
-            key,
-        )
-
-    @jax.jit
-    def apply_grad_critics(self, grads, critic_states):
-
-        for i, grad in enumerate(grads):
-            grads[i] = jax.tree_map(lambda x: jnp.clip(x, -1.0, 1.0), grad)
-
-        for i, critic_state in enumerate(critic_states):
-            critic_states[i] = critic_state.apply_gradients(grads=grads[i])
-
-        return critic_states
 
     @jax.jit
     def calc_entropy(
@@ -563,6 +549,7 @@ class SoftActorCritic:
         entropy_est = -jnp.mean(log_probs, axis=0)
         return entropy_est
 
+    @jax.jit
     def update_critics(
         self,
         observations: dict[str, np.ndarray],
@@ -570,32 +557,44 @@ class SoftActorCritic:
         rewards: np.ndarray,
         next_observations: dict[str, np.ndarray],
         dones: np.ndarray,
+        critic_states: list[train_state.TrainState],
+        target_critic_states: list[train_state.TrainState],
+        actor_state: train_state.TrainState,
+        alpha_state: train_state.TrainState,
+        key: jax.random.PRNGKey,
     ):
         """
         Update the critic networks by computing target values and minimizing Bellman error.
         """
-        critic_apply_fns = tuple([critic.apply_fn for critic in self.critic_states])
+        critic_apply_fns = tuple([critic.apply_fn for critic in critic_states])
         target_critic_apply_fns = tuple(
-            [critic.apply_fn for critic in self.target_critic_states]
+            [critic.apply_fn for critic in target_critic_states]
         )
-        (loss, (entropy, next_q_values)), grads = self.calc_critic_loss_grad(
-            [critic.params for critic in self.critic_states],
+        loss_fn = lambda list_params: self.calc_critic_loss(
+            list_params,
             critic_apply_fns,
-            [critic.params for critic in self.target_critic_states],
+            [critic.params for critic in target_critic_states],
             target_critic_apply_fns,
-            self.actor_state,
-            self.alpha_state,
+            actor_state,
+            alpha_state,
             observations,
             actions,
             rewards,
             next_observations,
             dones,
-            self.key,
+            key,
         )
-        self.critic_states = self.apply_grad_critics(grads, self.critic_states)
-        return {
+        (loss, (entropy, q_values, next_q_values)), grads = jax.value_and_grad(
+            loss_fn, has_aux=True
+        )([critic.params for critic in critic_states])
+
+        for i, critic_state in enumerate(critic_states):
+            critic_states[i] = critic_state.apply_gradients(grads=grads[i])
+
+        return critic_states, {
             "critic loss": loss,
             "critic entropy": entropy,
+            "q_values": q_values,
             "next_q_values": next_q_values,
         }
 
@@ -650,40 +649,34 @@ class SoftActorCritic:
             rep_observations[key] = self._expand_repeat(value, num_repeats)
         return rep_observations
 
-    @functools.partial(jax.jit, static_argnums=(2))
-    def calc_actor_loss_grad(
-        self,
-        actor_params: struct.PyTreeNode,
-        actor_apply_fn: Callable,
-        critic_states: train_state.TrainState,
-        alpha_state: train_state.TrainState,
-        observations: dict[str, np.ndarray],
-        key: jax.random.PRNGKey,
-    ):
-        grad_fn = jax.value_and_grad(self.calc_actor_loss, has_aux=True)
-        return grad_fn(
-            actor_params, actor_apply_fn, critic_states, alpha_state, observations, key
-        )
-
+    @jax.jit
     def update_actor(
         self,
         observations: dict[str, np.ndarray],
+        actor_state: train_state.TrainState,
+        critic_states: list[train_state.TrainState],
+        alpha_state: train_state.TrainState,
+        key: jax.random.PRNGKey,
     ):
-        (loss, (entropy, alpha)), grads = self.calc_actor_loss_grad(
-            self.actor_state.params,
-            self.actor_state.apply_fn,
-            self.critic_states,
-            self.alpha_state,
+        loss_fn = lambda params: self.calc_actor_loss(
+            params,
+            actor_state.apply_fn,
+            critic_states,
+            alpha_state,
             observations,
-            self.key,
+            key,
         )
-        self.actor_state = self.actor_state.apply_gradients(grads=grads)
-        return {
+        (loss, (entropy, alpha)), grads = jax.value_and_grad(loss_fn, has_aux=True)(
+            actor_state.params
+        )
+        actor_state = actor_state.apply_gradients(grads=grads)
+        return actor_state, {
             "actor loss": loss,
             "actor entropy": entropy,
             "alpha": alpha,
         }
 
+    @functools.partial(jax.jit, static_argnums=(2))
     def calc_alpha_loss(
         self,
         alpha_params: struct.PyTreeNode,
@@ -710,45 +703,33 @@ class SoftActorCritic:
 
         return loss, alpha
 
-    @functools.partial(jax.jit, static_argnums=(2))
-    def calc_alpha_loss_grad(
+    @jax.jit
+    def update_alpha(
         self,
-        alpha_params: struct.PyTreeNode,
-        alpha_apply_fn: Callable,
-        actor_state: train_state.TrainState,
-        target_entropy: np.ndarray,
         observations: dict[str, np.ndarray],
+        alpha_state: train_state.TrainState,
+        actor_state: train_state.TrainState,
+        target_entropy: float,
         key: jax.random.PRNGKey,
     ):
-        grad_fn = jax.value_and_grad(self.calc_alpha_loss, has_aux=True)
-        return grad_fn(
-            alpha_params,
-            alpha_apply_fn,
+        """
+        Update the temperature parameter alpha.
+        """
+        # Q-values
+        loss_fn = lambda alpha: self.calc_alpha_loss(
+            alpha,
+            alpha_state.apply_fn,
             actor_state,
             target_entropy,
             observations,
             key,
         )
-
-    def update_alpha(self, observations: dict[str, np.ndarray]):
-        """
-        Update the temperature parameter alpha.
-        """
-        # Q-values
-        (loss, alpha), grads = self.calc_alpha_loss_grad(
-            self.alpha_state.params,
-            self.alpha_state.apply_fn,
-            self.actor_state,
-            self.target_entropy,
-            observations,
-            self.key,
+        (loss, alpha), grads = jax.value_and_grad(loss_fn, has_aux=True)(
+            alpha_state.params
         )
 
-        self.alpha_state = self.alpha_state.apply_gradients(grads=grads)
-        return {
-            "alpha loss": loss,
-            "new_alpha": self.alpha_state.params["params"]["alpha"].mean(),
-        }
+        alpha_state = alpha_state.apply_gradients(grads=grads)
+        return alpha_state, {"alpha loss": loss}
 
     def update(
         self,
@@ -765,19 +746,44 @@ class SoftActorCritic:
 
         critic_infos = []
         for _ in range(self.num_critic_updates):
-            info = self.update_critics(
-                observations, actions, rewards, next_observations, dones
+            self.critic_states, critic_info = self.update_critics(
+                observations,
+                actions,
+                rewards,
+                next_observations,
+                dones,
+                self.critic_states,
+                self.target_critic_states,
+                self.actor_state,
+                self.alpha_state,
+                self.key,
             )
             self.target_critic_states = self.soft_update_target_critics(
-                self.tau, self.target_critic_states, self.critic_states
+                self.ema_decay, self.target_critic_states, self.critic_states
             )
 
-            critic_infos.append(info)
+            critic_infos.append(critic_info)
 
-        actor_info = self.update_actor(observations)
+        self.actor_state, actor_info = self.update_actor(
+            observations,
+            self.actor_state,
+            self.critic_states,
+            self.alpha_state,
+            self.key,
+        )
         # actor_info = {}
 
-        alpha_info = self.update_alpha(observations)
+        self.alpha_state, alpha_info = self.update_alpha(
+            observations,
+            self.alpha_state,
+            self.actor_state,
+            self.target_entropy,
+            self.key,
+        )
+
+        actor_lr = self.actor_state.opt_state.hyperparams["learning_rate"]
+        critic_lr = self.critic_states[0].opt_state.hyperparams["learning_rate"]
+        alpha_lr = self.alpha_state.opt_state.hyperparams["learning_rate"]
 
         critic_info = {
             k: np.mean([info[k] for info in critic_infos]) for k in critic_infos[0]
@@ -787,8 +793,9 @@ class SoftActorCritic:
             **actor_info,
             **critic_info,
             **alpha_info,
-            # "actor_lr": self.actor_lr_scheduler.get_last_lr()[0],
-            # "critics_lr": self.critics_lr_scheduler.get_last_lr()[0],
+            "actor_lr": actor_lr,
+            "critics_lr": critic_lr,
+            "alpha_lr": alpha_lr,
             # "moving_average_reward": self.moving_average_reward,
         }
 
@@ -831,7 +838,7 @@ class SoftActorCritic:
         aux_data = (
             self.key,
             self.discount,
-            self.tau,
+            self.ema_decay,
             self.num_critics,
             self.num_critic_updates,
             self.target_entropy,
