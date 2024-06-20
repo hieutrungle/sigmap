@@ -237,6 +237,7 @@ class SoftActorCritic:
     alpha_state: train_state.TrainState
     key: jax.random.PRNGKey
     discount: float = 0.99
+    # tau: float = 0.005
     ema_decay: float = 0.995
     num_critics: int = 2
     num_critic_updates: int = 5
@@ -255,6 +256,7 @@ class SoftActorCritic:
         alpha_learning_rate: float = 1e-4,
         num_train_steps: int = None,
         discount: float = 0.99,
+        # tau: float = 0.005,  # soft target update rate
         ema_decay: float = 0.995,  # soft target update rate
         num_critics: int = 2,
         num_critic_updates: int = 5,
@@ -402,21 +404,24 @@ class SoftActorCritic:
         """
         Update target critics with current critics.
         """
-        self.soft_update_target_critics(1.0)
+        return self.soft_update_target_critics(
+            1.0, self.target_critic_states, self.critic_states, self.num_critics
+        )
 
-    @functools.partial(jax.jit, static_argnums=(1))
+    @functools.partial(jax.jit, static_argnums=(4))
     def soft_update_target_critics(
         self,
         ema_decay: float,
         target_critic_states: list[train_state.TrainState],
         critic_states: list[train_state.TrainState],
+        num_critics: int,
     ):
         """
         Update target critics with moving average of current critics.
         """
-        for i, critic_state in enumerate(critic_states):
+        for i in range(num_critics):
             old = target_critic_states[i].params
-            new = critic_state.params
+            new = critic_states[i].params
             new_target_params = jax.tree.map(
                 lambda x, y: (1 - ema_decay) * x + y * ema_decay, new, old
             )
@@ -468,7 +473,6 @@ class SoftActorCritic:
         next_qs = jnp.repeat(next_qs, self.num_critics, axis=0)
         return next_qs
 
-    @functools.partial(jax.jit, static_argnums=(2, 4))
     def calc_critic_loss(
         self,
         list_critic_params: list[struct.PyTreeNode],
@@ -505,8 +509,8 @@ class SoftActorCritic:
 
         next_q_values = next_q_values + alpha * next_action_entropy
 
-        # lower_bound = -90.0  # dB
-        lower_bound = 0
+        lower_bound = -100.0  # dB
+        # lower_bound = 0
         advantages = rewards - lower_bound
 
         # Expand rewards and dones to match the number of critics
@@ -532,7 +536,6 @@ class SoftActorCritic:
         x = jnp.repeat(x, num_repeats, axis=0)
         return x
 
-    @jax.jit
     def calc_entropy(
         self,
         action_distribution: D.Distribution,
@@ -541,10 +544,9 @@ class SoftActorCritic:
         """
         Compute the (approximate) entropy of the action distribution for each batch element.
         """
-        samples = action_distribution.sample(
+        _, log_probs = action_distribution.sample_and_log_prob(
             seed=key, sample_shape=(self.num_actor_samples,)
         )
-        log_probs = action_distribution.log_prob(samples)
 
         entropy_est = -jnp.mean(log_probs, axis=0)
         return entropy_est
@@ -570,8 +572,8 @@ class SoftActorCritic:
         target_critic_apply_fns = tuple(
             [critic.apply_fn for critic in target_critic_states]
         )
-        loss_fn = lambda list_params: self.calc_critic_loss(
-            list_params,
+        loss_fn = lambda list_critic_params: self.calc_critic_loss(
+            list_critic_params,
             critic_apply_fns,
             [critic.params for critic in target_critic_states],
             target_critic_apply_fns,
@@ -590,15 +592,13 @@ class SoftActorCritic:
 
         for i, critic_state in enumerate(critic_states):
             critic_states[i] = critic_state.apply_gradients(grads=grads[i])
-
         return critic_states, {
             "critic loss": loss,
-            "critic entropy": entropy,
-            "q_values": q_values,
-            "next_q_values": next_q_values,
+            "critic entropy": jnp.mean(entropy),
+            "q_values": jnp.mean(q_values),
+            "next_q_values": jnp.mean(next_q_values),
         }
 
-    @functools.partial(jax.jit, static_argnums=(2))
     def calc_actor_loss(
         self,
         actor_params: struct.PyTreeNode,
@@ -676,7 +676,6 @@ class SoftActorCritic:
             "alpha": alpha,
         }
 
-    @functools.partial(jax.jit, static_argnums=(2))
     def calc_alpha_loss(
         self,
         alpha_params: struct.PyTreeNode,
@@ -715,21 +714,25 @@ class SoftActorCritic:
         """
         Update the temperature parameter alpha.
         """
-        # Q-values
-        loss_fn = lambda alpha: self.calc_alpha_loss(
-            alpha,
+
+        loss_fn = lambda params: self.calc_alpha_loss(
+            params,
             alpha_state.apply_fn,
             actor_state,
             target_entropy,
             observations,
             key,
         )
+
         (loss, alpha), grads = jax.value_and_grad(loss_fn, has_aux=True)(
             alpha_state.params
         )
 
         alpha_state = alpha_state.apply_gradients(grads=grads)
-        return alpha_state, {"alpha loss": loss}
+        return alpha_state, {
+            "alpha loss": loss,
+            "new_alpha": alpha_state.params["params"]["alpha"].mean(),
+        }
 
     def update(
         self,
@@ -759,7 +762,10 @@ class SoftActorCritic:
                 self.key,
             )
             self.target_critic_states = self.soft_update_target_critics(
-                self.ema_decay, self.target_critic_states, self.critic_states
+                self.ema_decay,
+                self.target_critic_states,
+                self.critic_states,
+                self.num_critics,
             )
 
             critic_infos.append(critic_info)
@@ -771,7 +777,6 @@ class SoftActorCritic:
             self.alpha_state,
             self.key,
         )
-        # actor_info = {}
 
         self.alpha_state, alpha_info = self.update_alpha(
             observations,
@@ -781,13 +786,13 @@ class SoftActorCritic:
             self.key,
         )
 
-        actor_lr = self.actor_state.opt_state.hyperparams["learning_rate"]
-        critic_lr = self.critic_states[0].opt_state.hyperparams["learning_rate"]
-        alpha_lr = self.alpha_state.opt_state.hyperparams["learning_rate"]
-
         critic_info = {
             k: np.mean([info[k] for info in critic_infos]) for k in critic_infos[0]
         }
+
+        actor_lr = self.actor_state.opt_state.hyperparams["learning_rate"]
+        critic_lr = self.critic_states[0].opt_state.hyperparams["learning_rate"]
+        alpha_lr = self.alpha_state.opt_state.hyperparams["learning_rate"]
 
         return {
             **actor_info,
@@ -796,7 +801,6 @@ class SoftActorCritic:
             "actor_lr": actor_lr,
             "critics_lr": critic_lr,
             "alpha_lr": alpha_lr,
-            # "moving_average_reward": self.moving_average_reward,
         }
 
     def save(self, step: int):
