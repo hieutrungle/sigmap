@@ -23,8 +23,7 @@ class WirelessEnvV2(Env):
         self,
         sionna_config_file,
         num_devices,
-        num_tiles_per_device,
-        controlled_elements,
+        seed,
         action_scale=1.0,
         **kwargs,
     ):
@@ -34,8 +33,8 @@ class WirelessEnvV2(Env):
 
         self.action_scale = action_scale
         self.num_devices = num_devices
-        self.num_tiles_per_device = num_tiles_per_device
-        self.controlled_elements = controlled_elements
+        self.seed = seed
+        self.rng = np.random.default_rng(self.seed)
 
         self.sionna_config_file = sionna_config_file
         config_kwargs = utils.load_yaml_file(sionna_config_file)
@@ -103,10 +102,7 @@ class WirelessEnvV2(Env):
         self.ep_step = 0
 
         # Random initial state
-        # self._focal_pts = np.random.uniform(
-        #     self.focal_pts_low, self.focal_pts_high, size=self.focal_pts_shape
-        # )
-        self._focal_pts = np.random.randn(*self.focal_pts_shape)
+        self._focal_pts = self.rng.normal(size=self.focal_pts_shape)
         self._focal_pts[:, 0] += self._default_tx_positions
         self._focal_pts[:, 1] += self._default_rx_positions
         self._focal_pts = np.asarray(self._focal_pts, dtype=np.float32)
@@ -301,6 +297,8 @@ class WirelessEnvV2(Env):
             viz_scene_path,
             "--saved_path",
             render_filename,
+            "--seed",
+            str(self.seed),
             # "--cmap_enabled",
             "--paths_enabled",
         ]
@@ -319,28 +317,6 @@ class WirelessEnvV2(Env):
         with open(results_file, "r") as f:
             results_dict = json.load(f)
             path_gain = results_dict["path_gain"]
-
-        # config = sigmap.utils.scripting_utils.make_sionna_config(
-        #     self.sionna_config_file
-        # )
-        # sig_cmap = sigmap.compute.signal_cmap.SignalCoverageMap(
-        #     config, compute_scene_path, viz_scene_path
-        # )
-        # coverage_map = sig_cmap.compute_cmap()
-
-        # img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
-        # mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
-        #     "mitsuba_filename"
-        # ]
-        # render_filename = utils.create_filename(
-        #     img_dir, f"{mitsuba_filename}_00000.png"
-        # )
-        # sig_cmap.render_to_file(coverage_map, filename=render_filename)
-        # path_gain = sig_cmap.get_path_gain(
-        #     coverage_map,
-        # )
-        # del coverage_map
-        # del sig_cmap
 
         path_gain = float(path_gain)
         path_gain_dB = utils.linear2dB(path_gain)
