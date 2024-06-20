@@ -5,7 +5,7 @@ import os
 import json
 import glob
 
-from sigmap.drl.infrastructure.data_types import Observations
+# from sigmap.drl.infrastructure.data_types import Observations
 from sigmap.utils import utils
 
 
