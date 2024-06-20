@@ -46,13 +46,11 @@ def main():
     # del coverage_map
 
     paths = sig_cmap.compute_paths() if args.paths_enabled else None
-    subcarrier_spacing = 15e3
-    fft_size = 48
+    # subcarrier_spacing = 15e3
+    # fft_size = 48
     a, tau = paths.cir()
-    frequencies = sionna.channel.subcarrier_frequencies(fft_size, subcarrier_spacing)
-    h_freq = sionna.channel.cir_to_ofdm_channel(frequencies, a, tau, normalize=False)
-    h_freq_avg_power = tf.reduce_mean(tf.abs(h_freq) ** 2).numpy()
-    path_gain = h_freq_avg_power
+    a = tf.squeeze(a)
+    path_gain = tf.reduce_mean(tf.reduce_sum(tf.abs(a) ** 2, axis=-1)).numpy()
     tmp_dir = utils.get_tmp_dir()
     results_file = os.path.join(tmp_dir, "path_gain.txt")
     results_dict = {
