@@ -1,12 +1,7 @@
 from typing import Tuple, Optional, Sequence
 import numpy as np
-import torch
-import torch.nn as nn
-from sigmap.drl.networks.mlp_policy import MLPPolicy
-from sigmap.drl.networks.state_action_value_critic import StateActionCritic
 
 import gymnasium as gym
-from sigmap.drl.env_configs.schedule import CosineAnnealingWarmupRestarts
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 import argparse
@@ -39,32 +34,12 @@ def wireless_config(
     seed: int = 0,
 ):
 
-    def make_lr_schedule(
-        optimizer: torch.optim.Optimizer,
-    ) -> torch.optim.lr_scheduler._LRScheduler:
-        max_lr = (actor_learning_rate + critic_learning_rate) / 2
-        min_lr = max_lr / 50
-        return CosineAnnealingWarmupRestarts(
-            optimizer,
-            first_cycle_steps=int(
-                ((total_steps - training_starts) * num_train_steps_per_env_step) // 1
-            ),
-            cycle_mult=1.0,
-            max_lr=max_lr,
-            min_lr=min_lr,
-            warmup_steps=int(
-                ((total_steps - training_starts) * num_train_steps_per_env_step) // 16
-            ),
-            gamma=1 / 2,
-        )
-
     def make_env(render: bool = False):
         return gym.make(
             env_name,
             sionna_config_file=args.sionna_config_file,
             num_devices=args.num_devices,
-            num_tiles_per_device=args.num_tiles_per_device,
-            controlled_elements=args.controlled_elements,
+            seed=seed,
             render_mode="rgb_array" if render else None,
         )
 
