@@ -166,8 +166,6 @@ def main():
 
     # Wireless environment specific arguments
     parser.add_argument("--num_devices", "-ndev", type=int, default=1)
-    parser.add_argument("--num_tiles_per_device", "-ntiles", type=int, default=70)
-    parser.add_argument("--controlled_elements", "-ce", type=int, default=2)
 
     args = parser.parse_args()
 
