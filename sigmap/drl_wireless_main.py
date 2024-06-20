@@ -60,6 +60,8 @@ def run_training_loop(
     ac_space = env.action_space
     ac_shape = ac_space.shape
 
+    seed = drl_config.seed
+
     agent = SoftActorCritic.create(
         ob_shapes,
         ac_shape,
@@ -72,7 +74,7 @@ def run_training_loop(
     buffer_saved_dir = os.path.join(replay_buffer_dir, buffer_name)
     utils.mkdir_not_exists(buffer_saved_dir)
     replay_buffer = WirelessReplayBuffer(
-        drl_config.replay_buffer_capacity, buffer_saved_dir
+        drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
     )
 
     best_return = -np.inf
@@ -133,8 +135,6 @@ def run_training_loop(
                 update_info = agent.update(obs, actions, rewards, next_obs, dones, step)
 
             # logging
-            # update_info["actor_lr"] = agent.actor_lr_scheduler.get_last_lr()[0]
-            # update_info["critic_lr"] = agent.critics_lr_scheduler.get_last_lr()[0]
 
             if step % args.log_interval == 0:
                 for k, v in update_info.items():
