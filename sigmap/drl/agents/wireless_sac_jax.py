@@ -548,7 +548,7 @@ class SoftActorCritic:
 
         loss = jnp.mean((q_values - target_q_values) ** 2)
 
-        return loss, (next_action_entropy, q_values, next_q_values)
+        return loss, (target_q_values, q_values, next_action_entropy, next_q_values)
 
     def _expand_repeat(self, x, num_repeats):
         x = jnp.expand_dims(x, axis=0)
@@ -605,7 +605,7 @@ class SoftActorCritic:
             dones,
             key,
         )
-        (loss, (entropy, q_values, next_q_values)), grads = jax.value_and_grad(
+        (loss, (target_q_values, q_values, entropy, next_q_values)), grads = jax.value_and_grad(
             loss_fn, has_aux=True
         )([critic.params for critic in critic_states])
 
@@ -613,9 +613,10 @@ class SoftActorCritic:
             critic_states[i] = critic_state.apply_gradients(grads=grads[i])
         return critic_states, {
             "critic loss": loss,
-            "critic entropy": jnp.mean(entropy),
+            "target_q_values": jnp.mean(target_q_values),
             "q_values": jnp.mean(q_values),
             "next_q_values": jnp.mean(next_q_values),
+            "critic entropy": jnp.mean(entropy),
         }
 
     def calc_actor_loss(
