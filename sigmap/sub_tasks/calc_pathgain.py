@@ -29,6 +29,8 @@ def main():
         utils.log_args(args)
         utils.log_config(config)
 
+    tf.random.set_seed(args.seed)
+
     # Prepare folders
     sig_cmap = compute.signal_cmap.SignalCoverageMap(
         config, args.compute_scene_path, args.viz_scene_path, args.verbose
@@ -72,6 +74,8 @@ def create_args() -> argparse.ArgumentParser:
     parser.add_argument("--cmap_enabled", action="store_true", default=False)
     parser.add_argument("--paths_enabled", action="store_true", default=False)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
+    parser.add_argument("--seed", type=int, default=0)
+
     scripting_utils.add_dict_to_argparser(parser, defaults)
     args = parser.parse_args()
     if args.viz_scene_path is None or args.viz_scene_path == "":
