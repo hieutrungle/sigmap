@@ -119,10 +119,11 @@ class Actor(nn.Module):
 
         means = means.reshape((*means.shape[:-1], *self.action_shape))
         log_stds = log_stds.reshape((*log_stds.shape[:-1], *self.action_shape))
-        dist = D.Normal(means, jnp.exp(log_stds))
-        dist = D.Transformed(dist, D.Tanh())
-        dist = D.Independent(dist, reinterpreted_batch_ndims=len(self.action_shape))
-        return dist
+        # dist = D.Normal(means, jnp.exp(log_stds))
+        # dist = D.Transformed(dist, D.Tanh())
+        # dist = D.Independent(dist, reinterpreted_batch_ndims=len(self.action_shape))
+        # return dist
+        return means, log_stds
 
 
 class Critic(nn.Module):
@@ -378,6 +379,24 @@ class SoftActorCritic:
             num_actor_samples,
             checkpoint_manager,
         )
+        
+    def make_action_distribution(self, means: jnp.ndarray, log_stds: jnp.ndarray, reinterpreted_batch_ndims=3) -> D.Distribution:
+        action_dist = D.Normal(means, jnp.exp(log_stds))
+        action_dist = D.Transformed(action_dist, D.Tanh())
+        action_dist = D.Independent(action_dist, reinterpreted_batch_ndims=reinterpreted_batch_ndims)
+        return action_dist
+
+    def get_action_distribution(
+        self,
+        observations: dict[np.ndarray],
+        actor_params: struct.PyTreeNode,
+        actor_apply_fn: Callable,
+    ) -> D.Distribution:
+        """
+        Compute an action distribution for a given observation.
+        """
+        means, log_stds = actor_apply_fn(actor_params, observations)
+        return self.make_action_distribution(means, log_stds, reinterpreted_batch_ndims=3)
 
     @jax.jit
     def _get_action(
@@ -387,10 +406,10 @@ class SoftActorCritic:
         key: jax.random.PRNGKey,
     ) -> np.ndarray:
         rep_observation = self._replicate_observations(observation, num_repeats=1)
-        action_distribution: D.Distribution = actor_state.apply_fn(
-            actor_state.params, rep_observation
+        action_dist = self.get_action_distribution(
+            rep_observation, actor_state.params, actor_state.apply_fn
         )
-        action = action_distribution.sample(seed=key)
+        action = action_dist.sample(seed=key)
         return jnp.squeeze(action, axis=0)
 
     def get_action(self, observation: dict[np.ndarray]) -> np.ndarray:
@@ -490,8 +509,8 @@ class SoftActorCritic:
     ):
 
         # Target Q-values
-        next_action_distribution: D.Distribution = actor_state.apply_fn(
-            actor_state.params, next_observations
+        next_action_distribution: D.Distribution = self.get_action_distribution(
+            next_observations, actor_state.params, actor_state.apply_fn
         )
         next_actions = next_action_distribution.sample(seed=key)
         next_q_values = self.run_critics(
@@ -608,8 +627,9 @@ class SoftActorCritic:
         observations: dict[str, np.ndarray],
         key: jax.random.PRNGKey,
     ):
-        # Q-values
-        action_distribution: D.Distribution = actor_apply_fn(actor_params, observations)
+        action_distribution: D.Distribution = self.get_action_distribution(
+            observations, actor_params, actor_apply_fn
+        )
         actions = action_distribution.sample(
             seed=key, sample_shape=(self.num_actor_samples,)
         )
@@ -688,9 +708,8 @@ class SoftActorCritic:
         """
         Update the temperature parameter alpha.
         """
-        # Q-values
-        action_distribution: D.Distribution = actor_state.apply_fn(
-            actor_state.params, observations
+        action_distribution: D.Distribution = self.get_action_distribution(
+            observations, actor_state.params, actor_state.apply_fn
         )
 
         # Loss
