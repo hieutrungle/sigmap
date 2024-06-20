@@ -379,11 +379,15 @@ class SoftActorCritic:
             num_actor_samples,
             checkpoint_manager,
         )
-        
-    def make_action_distribution(self, means: jnp.ndarray, log_stds: jnp.ndarray, reinterpreted_batch_ndims=3) -> D.Distribution:
+
+    def make_action_distribution(
+        self, means: jnp.ndarray, log_stds: jnp.ndarray, reinterpreted_batch_ndims=3
+    ) -> D.Distribution:
         action_dist = D.Normal(means, jnp.exp(log_stds))
         action_dist = D.Transformed(action_dist, D.Tanh())
-        action_dist = D.Independent(action_dist, reinterpreted_batch_ndims=reinterpreted_batch_ndims)
+        action_dist = D.Independent(
+            action_dist, reinterpreted_batch_ndims=reinterpreted_batch_ndims
+        )
         return action_dist
 
     def get_action_distribution(
@@ -396,7 +400,9 @@ class SoftActorCritic:
         Compute an action distribution for a given observation.
         """
         means, log_stds = actor_apply_fn(actor_params, observations)
-        return self.make_action_distribution(means, log_stds, reinterpreted_batch_ndims=3)
+        return self.make_action_distribution(
+            means, log_stds, reinterpreted_batch_ndims=3
+        )
 
     @jax.jit
     def _get_action(
@@ -528,8 +534,8 @@ class SoftActorCritic:
 
         next_q_values = next_q_values + alpha * next_action_entropy
 
-        lower_bound = -100.0  # dB
-        # lower_bound = 0
+        # lower_bound = -100.0  # dB
+        lower_bound = 0
         advantages = rewards - lower_bound
 
         # Expand rewards and dones to match the number of critics
@@ -548,7 +554,12 @@ class SoftActorCritic:
 
         loss = jnp.mean((q_values - target_q_values) ** 2)
 
-        return loss, (target_q_values, q_values, next_action_entropy, next_q_values)
+        return loss, (
+            target_q_values,
+            q_values,
+            next_action_entropy,
+            self.linear2dB(next_q_values),
+        )
 
     def _expand_repeat(self, x, num_repeats):
         x = jnp.expand_dims(x, axis=0)
@@ -605,9 +616,11 @@ class SoftActorCritic:
             dones,
             key,
         )
-        (loss, (target_q_values, q_values, entropy, next_q_values)), grads = jax.value_and_grad(
-            loss_fn, has_aux=True
-        )([critic.params for critic in critic_states])
+        (loss, (target_q_values, q_values, entropy, next_q_values)), grads = (
+            jax.value_and_grad(loss_fn, has_aux=True)(
+                [critic.params for critic in critic_states]
+            )
+        )
 
         for i, critic_state in enumerate(critic_states):
             critic_states[i] = critic_state.apply_gradients(grads=grads[i])
