@@ -111,4 +111,5 @@ def wireless_config(
         "batch_size": batch_size,
         "make_env": make_env,
         "num_train_steps_per_env_step": num_train_steps_per_env_step,
+        "seed": seed,
     }
