@@ -309,7 +309,7 @@ class WirelessEnvV2(Env):
                 sionna_command, check=True, stdout=open(sionna_output_txt, "a")
             )
         except subprocess.CalledProcessError as e:
-            raise Exception(f"Error running Blender command: {e}")
+            raise Exception(f"Error running Sionna command: {e}")
         finally:
             pass
 
