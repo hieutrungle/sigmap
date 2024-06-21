@@ -3,7 +3,7 @@ numpy
 setuptools
 sionna
 tensorflow[and-cuda]
-jax[cuda12]
+jax[cuda12]==0.4.28
 PyYAML
 opencv-python
 tqdm
