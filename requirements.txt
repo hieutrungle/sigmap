@@ -11,3 +11,4 @@ tensorboard
 tensorboardX
 gymnasium
 distrax
+flax
