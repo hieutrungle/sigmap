@@ -2,12 +2,17 @@ import time
 import os
 import argparse
 
-gpu_num = 0
-os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
+# gpu_num = 0
+# os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["TF_GPU_ALLOCATOR"] = "cuda_malloc_async"  # to avoid memory fragmentation
 # os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = ".10"
+
+import tensorflow as tf
+
+devices = tf.config.list_physical_devices("GPU")
+print(f"number of GPUs: {len(devices)}")
 
 from sigmap.drl.agents.wireless_sac_jax import SoftActorCritic
 from sigmap.drl.infrastructure.replay_buffer import WirelessReplayBuffer
