@@ -4,7 +4,7 @@ exp_name: sac_beamforming
 env_name: wireless-sigmap-v2
 
 replay_buffer_capacity: 10500
-total_steps: 10000
+total_steps: 5000
 random_steps: 257
 training_starts: 257
 
