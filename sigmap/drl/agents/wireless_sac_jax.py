@@ -18,7 +18,6 @@ from flax import linen as nn  # nn notation also used in PyTorch and in Flax's o
 
 from flax.training import train_state
 import orbax.checkpoint as ocp
-from flax.training import orbax_utils
 
 # JAX optimizers - a separate lib developed by DeepMind
 import optax

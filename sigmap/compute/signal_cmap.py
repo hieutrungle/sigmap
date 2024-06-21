@@ -1,12 +1,7 @@
 from sigmap.utils import utils, timer, logger, map_prep
 import os
 import sionna.rt
-from typing import List
-import tensorflow as tf
 import gc
-
-tf.config.threading.set_inter_op_parallelism_threads(0)
-tf.config.threading.get_intra_op_parallelism_threads()
 
 
 class SignalCoverageMap:
