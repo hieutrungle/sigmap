@@ -61,5 +61,5 @@ cm_cell_size:
 - 0.2
 cm_num_samples: 2000000.0
 path_max_depth: 15
-path_num_samples: 2000000.0
+path_num_samples: 4000000.0
 diffraction: true
