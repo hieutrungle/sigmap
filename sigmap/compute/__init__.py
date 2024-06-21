@@ -1,1 +1,1 @@
-from . import coverage_map, signal_cmap
+from . import signal_cmap
