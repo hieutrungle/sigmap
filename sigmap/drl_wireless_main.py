@@ -85,6 +85,9 @@ def run_training_loop(
     best_return = -np.inf
     (observation, info) = env.reset()
 
+    # TODO: resume from existing replay buffer, checkpoint if specified thru args.resume
+    # TODO: load agent, load replay buffer, modify sionna env to support loading from checkpoint
+
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
         # accumulate data in replay buffer
         if step < drl_config.random_steps * 3 / 4:
@@ -102,7 +105,13 @@ def run_training_loop(
         # ! TODO: GPU memory leak in env because of tensorflow persistent state
         # ! may use subprocess to run env in separate process
         # ! but this makes it difficult to debug and increase run time
-        next_observation, reward, terminated, truncated, info = env.step(action)
+        try:
+            next_observation, reward, terminated, truncated, info = env.step(action)
+        except Exception as e:
+            print(f"Error in step {step}: {e}")
+            time.sleep(1)
+            continue
+
         if terminated:
             actions = next_observation["focal_pts"] - observation["focal_pts"]
             print(f"Terminated at step {step}")
