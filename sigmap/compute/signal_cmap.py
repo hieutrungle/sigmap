@@ -1,4 +1,5 @@
 from sigmap.utils import utils, timer, logger, map_prep
+import tensorflow as tf
 import os
 import sionna.rt
 import gc
