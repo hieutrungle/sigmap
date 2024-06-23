@@ -36,21 +36,18 @@ def main():
         config, args.compute_scene_path, args.viz_scene_path, args.verbose
     )
 
-    # coverage_map = sig_cmap.compute_cmap() if args.cmap_enabled else None
-    # path_gain = sig_cmap.get_path_gain(coverage_map)
-    # print(f"Path gain from cmap: {path_gain}")
-    # print(f"Path gain from cmap: {utils.linear2dB(path_gain)} dB\n")
+    if not args.use_cmap:
+        paths = sig_cmap.compute_paths()
+        a, tau = paths.cir()
+        a = tf.squeeze(a)
+        path_gain = tf.reduce_mean(tf.reduce_sum(tf.abs(a) ** 2, axis=-1)).numpy()
 
-    # sig_cmap.render_to_file(coverage_map, None, filename=args.saved_path)
+    else:
+        coverage_map = sig_cmap.compute_cmap()
+        path_gain = sig_cmap.get_path_gain(coverage_map)
 
-    # del coverage_map
+        sig_cmap.render_to_file(coverage_map, None, filename=args.saved_path)
 
-    paths = sig_cmap.compute_paths() if args.paths_enabled else None
-    # subcarrier_spacing = 15e3
-    # fft_size = 48
-    a, tau = paths.cir()
-    a = tf.squeeze(a)
-    path_gain = tf.reduce_mean(tf.reduce_sum(tf.abs(a) ** 2, axis=-1)).numpy()
     tmp_dir = utils.get_tmp_dir()
     results_file = os.path.join(tmp_dir, "path_gain.txt")
     results_dict = {
@@ -69,8 +66,7 @@ def create_args() -> argparse.ArgumentParser:
     parser.add_argument("--compute_scene_path", "-cp", type=str, required=True)
     parser.add_argument("--viz_scene_path", "-vp", type=str)
     parser.add_argument("--saved_path", type=str, default=None)
-    parser.add_argument("--cmap_enabled", action="store_true", default=False)
-    parser.add_argument("--paths_enabled", action="store_true", default=False)
+    parser.add_argument("--use_cmap", action="store_true", default=False)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
     parser.add_argument("--seed", type=int, default=0)
 
