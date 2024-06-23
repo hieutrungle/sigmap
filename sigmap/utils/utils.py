@@ -276,3 +276,10 @@ def spherical2cartesian(
     y = r * np.sin(theta) * np.sin(phi)
     z = r * np.cos(theta)
     return x, y, z
+
+
+def add_batch_dimension(data: Union[np.ndarray, dict]):
+    if isinstance(data, dict):
+        return {k: add_batch_dimension(v) for k, v in data.items()}
+    else:
+        return data[None, ...]
