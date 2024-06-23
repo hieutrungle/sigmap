@@ -126,15 +126,16 @@ def run_eval_loop(
     drl_config: dict,
     tsb_logger: TensorboardLogger,
     args: argparse.Namespace,
-    env: gym.Env,
+    env,
     agent: SoftActorCritic,
     replay_buffer: WirelessReplayBuffer,
 ):
 
+    env.eval()
     agent.load()
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
-    (observation, info) = env.reset()
 
+    (observation, info) = env.reset()
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
         action = agent.get_action(observation)
         next_observation, reward, terminated, truncated, info = env.step(action)
@@ -145,9 +146,6 @@ def run_eval_loop(
             break
         else:
             observation = next_observation
-
-        reward = np.array(reward, dtype=np.float32)
-        done = np.array(done, dtype=np.float32)
 
         eval_return = info["episode"]["r"]
         tsb_logger.log_scalar(eval_return, "eval_return", step)
