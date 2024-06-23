@@ -36,51 +36,11 @@ def run_training_loop(
     # sionna_config: scripting_utils.Config,
     tsb_logger: TensorboardLogger,
     args: argparse.Namespace,
+    env: gym.Env,
+    agent: SoftActorCritic,
+    replay_buffer: WirelessReplayBuffer,
 ):
-    # set random seeds
-    np.random.seed(args.seed)
-
-    if args.verbose:
-        utils.log_args(args)
-        utils.log_config(drl_config)
-
-    env = drl_config.make_env()
-    # eval_env = drl_config.make_env()
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
-    discrete = isinstance(env.action_space, gym.spaces.Discrete)
-    assert (
-        not discrete
-    ), "Our wireless DRL implementation only supports continuous action spaces."
-
-    # simulation timestep, will be used for video saving
-    if "model" in dir(env):
-        fps = 1 / env.model.opt.timestep
-    else:
-        fps = env.env.metadata["render_fps"]
-
-    ob_space = env.observation_space
-    ob_shapes = {}
-    for k, v in ob_space.spaces.items():
-        ob_shapes[k] = v.shape
-    ac_space = env.action_space
-    ac_shape = ac_space.shape
-
-    seed = drl_config.seed
-
-    agent = SoftActorCritic.create(
-        ob_shapes,
-        ac_shape,
-        **drl_config.agent_kwargs,
-    )
-
-    assets_dir = utils.get_asset_dir()
-    replay_buffer_dir = os.path.join(assets_dir, "replay_buffer")
-    buffer_name = drl_config.log_name + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
-    buffer_saved_dir = os.path.join(replay_buffer_dir, buffer_name)
-    utils.mkdir_not_exists(buffer_saved_dir)
-    replay_buffer = WirelessReplayBuffer(
-        drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
-    )
 
     best_return = -np.inf
     (observation, info) = env.reset()
@@ -162,10 +122,96 @@ def run_training_loop(
     return
 
 
+def run_eval_loop(
+    drl_config: dict,
+    tsb_logger: TensorboardLogger,
+    args: argparse.Namespace,
+    env: gym.Env,
+    agent: SoftActorCritic,
+    replay_buffer: WirelessReplayBuffer,
+):
+
+    agent.load()
+    ep_len = drl_config.ep_len or env.spec.max_episode_steps
+    (observation, info) = env.reset()
+
+    for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
+        action = agent.get_action(observation)
+        next_observation, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
+        if done:
+            print(f"Terminated at step {step}")
+            break
+        else:
+            observation = next_observation
+
+        reward = np.array(reward, dtype=np.float32)
+        done = np.array(done, dtype=np.float32)
+
+        eval_return = info["episode"]["r"]
+        tsb_logger.log_scalar(eval_return, "eval_return", step)
+        tsb_logger.log_scalar(info["episode"]["l"], "eval_ep_len", step)
+
+
 def main():
+
+    args = parse_agrs()
+    drl_config = scripting_utils.make_drl_config(args.drl_config_file, args)
+    tsb_logger = scripting_utils.make_tensorboard_logger(drl_config)
+
+    # set random seeds
+    np.random.seed(args.seed)
+
+    if args.verbose:
+        utils.log_args(args)
+        utils.log_config(drl_config)
+
+    env = drl_config.make_env()
+    discrete = isinstance(env.action_space, gym.spaces.Discrete)
+    assert (
+        not discrete
+    ), "Our wireless DRL implementation only supports continuous action spaces."
+
+    ob_space = env.observation_space
+    ob_shapes = {}
+    for k, v in ob_space.spaces.items():
+        ob_shapes[k] = v.shape
+    ac_space = env.action_space
+    ac_shape = ac_space.shape
+
+    seed = drl_config.seed
+
+    agent = SoftActorCritic.create(
+        ob_shapes,
+        ac_shape,
+        **drl_config.agent_kwargs,
+    )
+
+    assets_dir = utils.get_asset_dir()
+    replay_buffer_dir = os.path.join(assets_dir, "replay_buffer")
+    buffer_name = drl_config.log_name + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
+    buffer_saved_dir = os.path.join(replay_buffer_dir, buffer_name)
+    utils.mkdir_not_exists(buffer_saved_dir)
+    replay_buffer = WirelessReplayBuffer(
+        drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
+    )
+
+    args.command = str(args.command).lower()
+    if args.command == "train":
+        run_training_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
+    elif args.command == "eval":
+        run_eval_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
+    else:
+        raise ValueError(f"Invalid command: {args.command}")
+
+
+def parse_agrs():
     parser = argparse.ArgumentParser()
     parser.add_argument("--drl_config_file", "-dcfg", type=str, required=True)
     parser.add_argument("--sionna_config_file", "-scfg", type=str, required=True)
+
+    parser.add_argument("--command", "-cmd", type=str, required=True)
 
     parser.add_argument("--eval_interval", "-ei", type=int, default=5000)
     parser.add_argument("--num_eval_trajectories", "-neval", type=int, default=10)
@@ -182,12 +228,7 @@ def main():
     parser.add_argument("--num_devices", "-ndev", type=int, default=1)
 
     args = parser.parse_args()
-
-    # sionna_config = scripting_utils.make_sionna_config(args.sionna_config_file)
-    drl_config = scripting_utils.make_drl_config(args.drl_config_file, args)
-    tsb_logger = scripting_utils.make_tensorboard_logger(drl_config)
-
-    run_training_loop(drl_config, tsb_logger, args)
+    return args
 
 
 if __name__ == "__main__":
