@@ -88,6 +88,8 @@ class WirelessEnvV2(Env):
         self._rx_positions = None
         self.info = {}
 
+        self.train()
+
     def _get_obs(self) -> dict:
         observation = {
             "focal_pts": np.asarray(self._focal_pts, dtype=np.float32),
@@ -119,6 +121,12 @@ class WirelessEnvV2(Env):
         )
         return self._get_obs(), self.info
 
+    def eval(self):
+        self.use_cmap = True
+
+    def train(self):
+        self.use_cmap = False
+
     def step(
         self, action: np.ndarray, **kwargs
     ) -> Tuple[dict, float, bool, bool, dict]:
@@ -148,14 +156,14 @@ class WirelessEnvV2(Env):
         ## Save focal_pts to a tmp file
         ## Open Blender to read the file and assign values to devices' tiles
         ## Then export the geometry file to Sionna
-        reward = self._cal_reward(self._focal_pts)
+        reward = self._cal_reward(self._focal_pts, use_cmap=self.use_cmap)
 
         # info
         self.info.update({"episode": {"r": reward, "l": self.ep_step}})
 
         return next_observation, reward, terminated, truncated, self.info
 
-    def _cal_reward(self, focal_pts):
+    def _cal_reward(self, focal_pts, use_cmap: bool = False):
         """
         Reward function for the wireless environment.
 
@@ -192,7 +200,7 @@ class WirelessEnvV2(Env):
         self._run_blender(focal_pts)
 
         # Run Sionna to get reward
-        reward = self._run_sionna()
+        reward = self._run_sionna(use_cmap=use_cmap)
 
         return reward
 
@@ -236,11 +244,11 @@ class WirelessEnvV2(Env):
         finally:
             os.remove(tmp_file)
 
-    def _run_sionna(self) -> float:
-        path_gain = self._cal_path_gain()
+    def _run_sionna(self, use_cmap: bool = False) -> float:
+        path_gain = self._cal_path_gain(use_cmap=use_cmap)
         return path_gain
 
-    def _cal_path_gain(self) -> float:
+    def _cal_path_gain(self, use_cmap: bool = False) -> float:
         assets_dir = utils.get_assets_dir()
 
         # Sionna simulation
@@ -278,15 +286,17 @@ class WirelessEnvV2(Env):
 
         sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
         # siona_script = os.path.join(sigmap_dir, "sigmap", "sub_tasks", "run_cmap.py")
-        siona_script = os.path.join(
-            sigmap_dir, "sigmap", "sub_tasks", "calc_pathgain.py"
-        )
+
         img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
         mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
             "mitsuba_filename"
         ]
         render_filename = utils.create_filename(
             img_dir, f"{mitsuba_filename}_00000.png"
+        )
+
+        siona_script = os.path.join(
+            sigmap_dir, "sigmap", "sub_tasks", "calc_pathgain.py"
         )
         sionna_command = [
             "python",
@@ -301,9 +311,9 @@ class WirelessEnvV2(Env):
             render_filename,
             "--seed",
             str(self.seed),
-            # "--cmap_enabled",
-            "--paths_enabled",
         ]
+        if use_cmap:
+            sionna_command.append("--use_cmap")
         tmp_dir = utils.get_tmp_dir()
         sionna_output_txt = os.path.join(tmp_dir, "sionna_outputs.txt")
         try:
