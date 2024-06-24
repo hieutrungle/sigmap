@@ -136,12 +136,13 @@ def run_eval_loop(
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
 
     (observation, info) = env.reset()
-    for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
+    for step in tqdm.trange(ep_len, dynamic_ncols=True):
         action = agent.get_action(observation)
         next_observation, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
         done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
         if done:
+            print(f"current position: {observation['focal_pts']}")
             print(f"Terminated at step {step}")
             break
         else:
