@@ -551,7 +551,7 @@ class SoftActorCritic:
             list_critic_params, list_critic_apply_fn, observations, actions
         )
 
-        loss = jnp.mean((q_values - target_q_values) ** 2)
+        loss = 0.5 * jnp.mean((q_values - target_q_values) ** 2)
 
         return loss, (
             target_q_values,
