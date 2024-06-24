@@ -238,8 +238,7 @@ class WirelessEnvV2(Env):
             subprocess.run(blender_command, check=True, stdout=open(bl_output_txt, "a"))
         except subprocess.CalledProcessError as e:
             os.remove(tmp_file)
-            print(f"Error running Blender command: {e}")
-            # raise Exception(f"Error running Blender command: {e}")
+            raise Exception(f"Error running Blender command: {e}")
 
         finally:
             os.remove(tmp_file)
@@ -285,7 +284,6 @@ class WirelessEnvV2(Env):
         )
 
         sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
-        # siona_script = os.path.join(sigmap_dir, "sigmap", "sub_tasks", "run_cmap.py")
 
         img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
         mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
@@ -321,8 +319,8 @@ class WirelessEnvV2(Env):
                 sionna_command, check=True, stdout=open(sionna_output_txt, "a")
             )
         except subprocess.CalledProcessError as e:
-            print(f"Error running Sionna command: {e}")
-            # raise Exception(f"Error running Sionna command: {e}")
+            # print(f"Error running Sionna command: {e}")
+            raise Exception(f"Error running Sionna command: {e}")
         finally:
             pass
 

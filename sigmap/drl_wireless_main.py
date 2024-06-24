@@ -69,7 +69,7 @@ def run_training_loop(
             next_observation, reward, terminated, truncated, info = env.step(action)
         except Exception as e:
             print(f"Error in step {step}: {e}")
-            time.sleep(1)
+            time.sleep(2)
             continue
 
         if terminated:
