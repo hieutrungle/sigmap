@@ -118,10 +118,6 @@ class Actor(nn.Module):
 
         means = means.reshape((*means.shape[:-1], *self.action_shape))
         log_stds = log_stds.reshape((*log_stds.shape[:-1], *self.action_shape))
-        # dist = D.Normal(means, jnp.exp(log_stds))
-        # dist = D.Transformed(dist, D.Tanh())
-        # dist = D.Independent(dist, reinterpreted_batch_ndims=len(self.action_shape))
-        # return dist
         return means, log_stds
 
 
@@ -236,13 +232,13 @@ class SoftActorCritic:
     target_critic_states: list[train_state.TrainState]
     alpha_state: train_state.TrainState
     key: jax.random.PRNGKey
-    discount: float = 0.99
-    # tau: float = 0.005
+    discount: float = 0.5
     ema_decay: float = 0.995
     num_critics: int = 2
     num_critic_updates: int = 5
     target_entropy: float = -10.0
     num_actor_samples: int = 5
+    num_action_dims: int = 1
     checkpoint_manager: ocp.CheckpointManager = None
 
     @classmethod
@@ -256,7 +252,6 @@ class SoftActorCritic:
         alpha_learning_rate: float = 1e-4,
         num_train_steps: int = None,
         discount: float = 0.99,
-        # tau: float = 0.005,  # soft target update rate
         ema_decay: float = 0.995,  # soft target update rate
         num_critics: int = 2,
         num_critic_updates: int = 5,
@@ -364,6 +359,8 @@ class SoftActorCritic:
             options=options,
         )
 
+        num_action_dims = len(action_shape)
+
         return cls(
             actor_state,
             critic_states,
@@ -376,11 +373,12 @@ class SoftActorCritic:
             num_critic_updates,
             target_entropy,
             num_actor_samples,
+            num_action_dims,
             checkpoint_manager,
         )
 
     def make_action_distribution(
-        self, means: jnp.ndarray, log_stds: jnp.ndarray, reinterpreted_batch_ndims=3
+        self, means: jnp.ndarray, log_stds: jnp.ndarray, reinterpreted_batch_ndims=1
     ) -> D.Distribution:
         action_dist = D.Normal(means, jnp.exp(log_stds))
         action_dist = D.Transformed(action_dist, D.Tanh())
@@ -400,7 +398,7 @@ class SoftActorCritic:
         """
         means, log_stds = actor_apply_fn(actor_params, observations)
         return self.make_action_distribution(
-            means, log_stds, reinterpreted_batch_ndims=3
+            means, log_stds, reinterpreted_batch_ndims=self.num_action_dims
         )
 
     @jax.jit
@@ -533,8 +531,8 @@ class SoftActorCritic:
 
         next_q_values = next_q_values + alpha * next_action_entropy
 
-        # lower_bound = -100.0  # dB
-        lower_bound = 0
+        lower_bound = -90.0  # dB
+        # lower_bound = 0
         advantages = rewards - lower_bound
 
         # Expand rewards and dones to match the number of critics
@@ -879,6 +877,7 @@ class SoftActorCritic:
             self.num_critic_updates,
             self.target_entropy,
             self.num_actor_samples,
+            self.num_action_dims,
             self.checkpoint_manager,
         )
         return children, aux_data
