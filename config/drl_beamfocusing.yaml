@@ -6,7 +6,7 @@ env_name: wireless-sigmap-v2
 replay_buffer_capacity: 10500
 total_steps: 5000
 random_steps: 500
-training_starts: 500
+training_starts: 600
 
 # Training settings
 actor_learning_rate: 0.0001
