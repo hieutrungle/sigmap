@@ -130,27 +130,101 @@ def run_eval_loop(
     agent: SoftActorCritic,
     replay_buffer: WirelessReplayBuffer,
 ):
+    import matplotlib.pyplot as plt
 
     env.eval()
     agent.load()
+
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
 
-    (observation, info) = env.reset()
-    for step in tqdm.trange(ep_len, dynamic_ncols=True):
-        action = agent.get_action(observation)
-        next_observation, reward, terminated, truncated, info = env.step(action)
-        done = terminated or truncated
-        done = done or (info.get("episode", {}).get("l", 0) >= ep_len)
-        if done:
-            print(f"current position: {observation['focal_pts']}")
-            print(f"Terminated at step {step}")
-            break
-        else:
-            observation = next_observation
+    eval_sums = np.zeros(ep_len)
+    eval_mins = np.ones(ep_len) * np.inf
+    eval_maxs = np.ones(ep_len) * -np.inf
+    max_step = 0
+    num_evals = 4
+    eval_count = np.zeros(ep_len)
+    eval_traj = np.zeros(ep_len)
+    # for _ in range(num_evals):
+    #     (observation, info) = env.reset()
+    #     for step in tqdm.trange(ep_len, dynamic_ncols=True):
+    #         action = agent.get_action(observation)
+    #         next_observation, reward, terminated, truncated, info = env.step(action)
+    #         done = terminated or truncated
+    #         if done:
+    #             print(f"current position: {observation['focal_pts']}")
+    #             print(f"Terminated at step {step}")
+    #             break
+    #         else:
+    #             observation = next_observation
 
-        eval_return = info["episode"]["r"]
-        tsb_logger.log_scalar(eval_return, "eval_return", step)
+    #         eval_return = info["episode"]["r"]
+
+    #         eval_count[step] += 1
+    #         eval_sums[step] += eval_return
+    #         max_step = max(max_step, step)
+
+    #         eval_mins[step] = min(eval_mins[step], eval_return)
+    #         eval_maxs[step] = max(eval_maxs[step], eval_return)
+
+    for _ in range(num_evals):
+        (observation, info) = env.reset()
+        for step in tqdm.trange(ep_len, dynamic_ncols=True):
+            action = agent.get_action(observation)
+            next_observation, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
+            if done:
+                print(f"current position: {observation['focal_pts']}")
+                print(f"Terminated at step {step}")
+                break
+            else:
+                observation = next_observation
+
+            eval_return = info["episode"]["r"]
+
+            eval_traj[step] = eval_return
+            eval_count[step] += 1
+            eval_sums[step] += eval_return
+            max_step = max(max_step, step)
+
+        eval_mins[: max_step + 1] = np.minimum(
+            eval_mins[: max_step + 1], eval_traj[: max_step + 1]
+        )
+        eval_maxs[: max_step + 1] = np.maximum(
+            eval_maxs[: max_step + 1], eval_traj[: max_step + 1]
+        )
+
+    max_step = max_step + 1
+    eval_means = eval_sums[:max_step] / eval_count[:max_step]
+
+    # trim the arrays to the max step
+    eval_mins = eval_mins[:max_step]
+    eval_maxs = eval_maxs[:max_step]
+
+    # log the evaluation results to tensorboard
+    for step in range(max_step):
+        tsb_logger.log_scalar(eval_means[step], "eval_return_mean", step)
+        tsb_logger.log_scalar(eval_mins[step], "eval_return_min", step)
+        tsb_logger.log_scalar(eval_maxs[step], "eval_return_max", step)
         tsb_logger.log_scalar(info["episode"]["l"], "eval_ep_len", step)
+
+    # plot the evaluation results
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
+    ax.plot(eval_means, label="mean")
+    ax.fill_between(
+        range(max_step), eval_mins, eval_maxs, alpha=0.3, label="min-max range"
+    )
+    ax.plot(eval_mins, label="min", linestyle="--")
+    ax.plot(eval_maxs, label="max", linestyle="--")
+    ax.grid()
+    ax.legend()
+    ax.set_title("Evaluation Results")
+    ax.set_xlabel("steps")
+    ax.set_ylabel("return")
+    # save the plot
+    saved_path = drl_config.saved_path
+    fig_name = f"eval_results.png"
+    fig_path = os.path.join(saved_path, fig_name)
+    plt.savefig(fig_path)
 
 
 def main():
