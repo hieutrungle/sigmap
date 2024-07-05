@@ -61,6 +61,8 @@ def wireless_config(
         (total_steps - training_starts) * num_train_steps_per_env_step
     )
 
+    saved_path = saved_path + log_string
+
     return {
         "agent_kwargs": {
             "hidden_sizes": hidden_sizes,
@@ -86,5 +88,6 @@ def wireless_config(
         "batch_size": batch_size,
         "make_env": make_env,
         "num_train_steps_per_env_step": num_train_steps_per_env_step,
+        "saved_path": saved_path,
         "seed": seed,
     }
