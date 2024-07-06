@@ -186,12 +186,10 @@ def run_eval_loop(
             eval_sums[step] += eval_return
             max_step = max(max_step, step)
 
-        eval_mins[: max_step + 1] = np.minimum(
-            eval_mins[: max_step + 1], eval_traj[: max_step + 1]
-        )
-        eval_maxs[: max_step + 1] = np.maximum(
-            eval_maxs[: max_step + 1], eval_traj[: max_step + 1]
-        )
+        # the current max step for indexing
+        t = max_step + 1
+        eval_mins[:t] = np.minimum(eval_mins[:t], eval_traj[:t])
+        eval_maxs[:t] = np.maximum(eval_maxs[:t], eval_traj[:t])
 
     max_step = max_step + 1
     eval_means = eval_sums[:max_step] / eval_count[:max_step]
