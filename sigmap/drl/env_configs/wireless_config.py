@@ -56,6 +56,7 @@ def wireless_config(
 
     log_string += f"_tem{temperature}"
     log_string += f"_stu{ema_decay}"  # soft_target_update_rate
+    log_string = log_string.replace(" ", "")
 
     num_train_steps = int(
         (total_steps - training_starts) * num_train_steps_per_env_step
