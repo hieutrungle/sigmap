@@ -43,7 +43,7 @@ def wireless_config(
             render_mode="rgb_array" if render else None,
         )
 
-    log_string = "{}_{}_s{}_aclr{}_crlr{}_allr{}_b{}_d{}".format(
+    log_string = "{}-{}-s{}-aclr{}-crlr{}-allr{}-b{}-d{}".format(
         exp_name or "offpolicy_ac",
         env_name,
         hidden_sizes,
@@ -54,15 +54,19 @@ def wireless_config(
         discount,
     )
 
-    log_string += f"_tem{temperature}"
-    log_string += f"_stu{ema_decay}"  # soft_target_update_rate
-    log_string = log_string.replace(" ", "")
+    log_string += f"-tem{temperature}"
+    log_string += f"-stu{ema_decay}"  # soft_target_update_rate
+    for replaced_str in [" ", "]", "}"]:
+        log_string = log_string.replace(replaced_str, "")
+    for replaced_str in ["[", ",", ".", "{"]:
+        log_string = log_string.replace(replaced_str, "_")
 
     num_train_steps = int(
         (total_steps - training_starts) * num_train_steps_per_env_step
     )
 
     saved_path = saved_path + log_string
+    # saved_path = saved_path + f"-seed{seed}"
 
     return {
         "agent_kwargs": {
