@@ -28,6 +28,7 @@ class WirelessReplayBuffer:
         self.size_counter = 0
         self.saved_dir = saved_dir
         self.name = name
+        self.saved_path = os.path.join(self.saved_dir, f"{self.name}.txt")
         self.prefix_idx = prefix_idx
         self.rng = np.random.default_rng(seed)
 
@@ -36,6 +37,22 @@ class WirelessReplayBuffer:
         self.rewards: np.ndarray = None
         self.next_observations: dict = None
         self.dones: np.ndarray = None
+
+        if os.path.exists(self.saved_path):
+            tmp_container = self.load_n_to_last_line(self.saved_path, n=self.max_size)
+            for line in tmp_container:
+                batch = json.loads(line)
+                batch = self.to_numpy(batch)
+                self.insert(
+                    observation=batch["observation"],
+                    action=batch["action"],
+                    reward=batch["reward"],
+                    next_observation=batch["next_observation"],
+                    done=batch["done"],
+                    is_saved=False,
+                )
+            print(f"Loaded {len(tmp_container)} samples from {self.saved_path}")
+            print(f"Current size: {self.size_counter}")
 
     def sample(
         self, batch_size: int
@@ -131,11 +148,11 @@ class WirelessReplayBuffer:
 
         # Save the batch to a file
         if is_saved:
-            saved_path = os.path.join(
-                self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
-            )
+            # saved_path = os.path.join(
+            #     self.saved_dir, f"{self.name}_{self.prefix_idx:04d}.txt"
+            # )
             self.save_data_to_file(
-                saved_path, observation, action, reward, next_observation, done
+                self.saved_path, observation, action, reward, next_observation, done
             )
 
         self.size_counter += 1
@@ -161,6 +178,37 @@ class WirelessReplayBuffer:
         with open(saved_path, "a") as f:
             json.dump(batch, f, cls=utils.NpEncoder)
             f.write("\n")
+
+    def load_n_to_last_line(self, filename: str, n: int = 1) -> list:
+        """Returns n entries before last line of a file (n=1 gives last line)"""
+        container = []
+        num_newlines = 0
+        with open(filename, "rb") as f:
+            try:
+                f.seek(-2, os.SEEK_END)
+                while num_newlines < n:
+                    f.seek(-2, os.SEEK_CUR)
+                    if f.read(1) == b"\n":
+                        num_newlines += 1
+                        pos = f.tell()
+                        container.append(f.readline().decode())
+                        f.seek(pos)
+            except OSError:
+                f.seek(0)
+                container.append(f.readline().decode())
+
+        return container
+
+    def to_numpy(self, data: Union[dict, list, float]) -> Union[np.ndarray, dict]:
+        if isinstance(data, dict):
+            return {key: self.to_numpy(value) for key, value in data.items()}
+        elif (
+            isinstance(data, list) or isinstance(data, tuple) or isinstance(data, float)
+        ):
+            return np.array(data)
+        else:
+            raise ValueError(f"Unsupported data type: {type(data)}")
+        return
 
 
 class ReplayBuffer:
