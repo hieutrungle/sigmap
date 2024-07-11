@@ -222,6 +222,8 @@ class WirelessEnvV2(Env):
             sigmap_dir, "sigmap", "blender_script", "bl_drl.py"
         )
         bl_output_txt = os.path.join(tmp_dir, "bl_outputs.txt")
+
+        # TODO: Need to update the blender_command to support different blender scenes
         blender_command = [
             blender_app,
             "-b",
