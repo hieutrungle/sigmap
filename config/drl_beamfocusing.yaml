@@ -4,15 +4,15 @@ exp_name: sac_beamforming
 env_name: wireless-sigmap-v2
 
 replay_buffer_capacity: 10500
-total_steps: 5000
-random_steps: 500
-training_starts: 600
+total_steps: 4
+random_steps: 1
+training_starts: 1
 
 # Training settings
 actor_learning_rate: 0.0001
 critic_learning_rate: 0.0005
 alpha_learning_rate: 0.0002
-batch_size: 256
+batch_size: 1
 num_train_steps_per_env_step: 10
 
 # Actor-critic configuration

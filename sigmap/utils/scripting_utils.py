@@ -52,15 +52,7 @@ def make_drl_config(config_file: str, args: argparse.Namespace) -> Config:
 
 
 def make_tensorboard_logger(config: dict) -> TensorboardLogger:
-    data_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../data")
-    if not (os.path.exists(data_path)):
-        os.makedirs(data_path)
-
-    # logdir = config["log_name"] + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
-    logdir = config.log_name + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
-    logdir = os.path.join(data_path, logdir)
-    if not (os.path.exists(logdir)):
-        os.makedirs(logdir)
+    logdir = os.path.join(config.saved_path, time.strftime("%d-%m-%Y_%H-%M-%S"))
 
     return TensorboardLogger(logdir)
 
