@@ -128,7 +128,6 @@ def run_eval_loop(
     args: argparse.Namespace,
     env,
     agent: SoftActorCritic,
-    replay_buffer: WirelessReplayBuffer,
 ):
     import matplotlib.pyplot as plt
 
@@ -144,27 +143,6 @@ def run_eval_loop(
     num_evals = 4
     eval_count = np.zeros(ep_len)
     eval_traj = np.zeros(ep_len)
-    # for _ in range(num_evals):
-    #     (observation, info) = env.reset()
-    #     for step in tqdm.trange(ep_len, dynamic_ncols=True):
-    #         action = agent.get_action(observation)
-    #         next_observation, reward, terminated, truncated, info = env.step(action)
-    #         done = terminated or truncated
-    #         if done:
-    #             print(f"current position: {observation['focal_pts']}")
-    #             print(f"Terminated at step {step}")
-    #             break
-    #         else:
-    #             observation = next_observation
-
-    #         eval_return = info["episode"]["r"]
-
-    #         eval_count[step] += 1
-    #         eval_sums[step] += eval_return
-    #         max_step = max(max_step, step)
-
-    #         eval_mins[step] = min(eval_mins[step], eval_return)
-    #         eval_maxs[step] = max(eval_maxs[step], eval_return)
 
     for _ in range(num_evals):
         (observation, info) = env.reset()
@@ -259,20 +237,20 @@ def main():
         **drl_config.agent_kwargs,
     )
 
-    assets_dir = utils.get_asset_dir()
-    replay_buffer_dir = os.path.join(assets_dir, "replay_buffer")
-    buffer_name = drl_config.log_name + "_" + time.strftime("%d-%m-%Y_%H-%M-%S")
-    buffer_saved_dir = os.path.join(replay_buffer_dir, buffer_name)
-    utils.mkdir_not_exists(buffer_saved_dir)
-    replay_buffer = WirelessReplayBuffer(
-        drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
-    )
-
     args.command = str(args.command).lower()
     if args.command == "train":
+
+        assets_dir = utils.get_asset_dir()
+        replay_buffer_dir = os.path.join(assets_dir, "replay_buffer")
+        buffer_saved_dir = os.path.join(replay_buffer_dir, drl_config.log_name)
+        utils.mkdir_not_exists(buffer_saved_dir)
+        replay_buffer = WirelessReplayBuffer(
+            drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
+        )
+
         run_training_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
     elif args.command == "eval":
-        run_eval_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
+        run_eval_loop(drl_config, tsb_logger, args, env, agent)
     else:
         raise ValueError(f"Invalid command: {args.command}")
 
