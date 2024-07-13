@@ -140,7 +140,7 @@ def run_eval_loop(
     eval_mins = np.ones(ep_len) * np.inf
     eval_maxs = np.ones(ep_len) * -np.inf
     max_step = 0
-    num_evals = 4
+    num_evals = 3
     eval_count = np.zeros(ep_len)
     eval_traj = np.zeros(ep_len)
 
