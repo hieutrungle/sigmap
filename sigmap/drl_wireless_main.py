@@ -135,6 +135,7 @@ def run_eval_loop(
     agent = agent.load()
 
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
+    ep_len = max(ep_len, 250)
 
     eval_sums = np.zeros(ep_len)
     eval_mins = np.ones(ep_len) * np.inf
