@@ -132,7 +132,7 @@ def run_eval_loop(
     import matplotlib.pyplot as plt
 
     env.eval()
-    agent.load()
+    agent = agent.load()
 
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
 
