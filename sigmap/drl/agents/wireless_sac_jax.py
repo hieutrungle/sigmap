@@ -845,7 +845,7 @@ class SoftActorCritic:
         """
         self.checkpoint_manager.wait_until_finished()
 
-    def load(self, step: int = None):
+    def load(self, step: int = None) -> "SoftActorCritic":
         """
         Load the agent's parameters from a file.
         """
