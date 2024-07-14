@@ -112,8 +112,8 @@ class WirelessEnvV2(Env):
             self._focal_pts[:, 1] += self._default_rx_positions
         else:
             self._focal_pts = self.rng.uniform(
-                self.focal_pts_low + 1.0,
-                self.focal_pts_high - 1.0,
+                self.focal_pts_low + 5.0,
+                self.focal_pts_high - 5.0,
                 size=self.focal_pts_shape,
             )
         self._focal_pts = np.asarray(self._focal_pts, dtype=np.float32)
