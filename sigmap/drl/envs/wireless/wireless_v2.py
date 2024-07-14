@@ -45,7 +45,7 @@ class WirelessEnvV2(Env):
         self._default_rx_positions = np.expand_dims(self._default_rx_positions, axis=0)
 
         # Observation space
-        # Each device has 2 focal points
+        # Each device has 2 focal points, 3 coordinates (x,y,z)
         self.focal_pts_shape = (num_devices, 2, 3)
         low = np.array([-25, -25, -10])
         low = np.tile(low, (self.num_devices, 2, 1))
@@ -98,15 +98,24 @@ class WirelessEnvV2(Env):
         }
         return observation
 
-    def reset(self, seed=None, options=None) -> Tuple[dict, dict]:
+    def reset(
+        self, use_constraints=False, seed=None, options=None
+    ) -> Tuple[dict, dict]:
         super().reset(seed=seed, options=options)
         self.ep_return = 0
         self.ep_step = 0
 
         # Random initial state
-        self._focal_pts = self.rng.normal(size=self.focal_pts_shape)
-        self._focal_pts[:, 0] += self._default_tx_positions
-        self._focal_pts[:, 1] += self._default_rx_positions
+        if use_constraints:
+            self._focal_pts = self.rng.normal(size=self.focal_pts_shape)
+            self._focal_pts[:, 0] += self._default_tx_positions
+            self._focal_pts[:, 1] += self._default_rx_positions
+        else:
+            self._focal_pts = self.rng.uniform(
+                self.focal_pts_low + 1.0,
+                self.focal_pts_high - 1.0,
+                size=self.focal_pts_shape,
+            )
         self._focal_pts = np.asarray(self._focal_pts, dtype=np.float32)
         self._focal_pts = np.clip(
             self._focal_pts, self.focal_pts_low, self.focal_pts_high
