@@ -47,10 +47,10 @@ class WirelessEnvV2(Env):
         # Observation space
         # Each device has 2 focal points, 3 coordinates (x,y,z)
         self.focal_pts_shape = (num_devices, 2, 3)
-        low = np.array([-25, -25, -10])
+        low = np.array([-30, -30, -15])
         low = np.tile(low, (self.num_devices, 2, 1))
         self.focal_pts_low = low
-        high = np.array([25, 25, 10])
+        high = np.array([30, 30, 15])
         high = np.tile(high, (self.num_devices, 2, 1))
         self.focal_pts_high = high
         focal_pts_space = spaces.Box(
@@ -111,9 +111,11 @@ class WirelessEnvV2(Env):
             self._focal_pts[:, 0] += self._default_tx_positions
             self._focal_pts[:, 1] += self._default_rx_positions
         else:
+            lower_bound = self.focal_pts_low + self.focal_pts_low * 0.25
+            upper_bound = self.focal_pts_high + self.focal_pts_high * 0.25
             self._focal_pts = self.rng.uniform(
-                self.focal_pts_low + 5.0,
-                self.focal_pts_high - 5.0,
+                lower_bound,
+                upper_bound,
                 size=self.focal_pts_shape,
             )
         self._focal_pts = np.asarray(self._focal_pts, dtype=np.float32)

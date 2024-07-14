@@ -131,11 +131,10 @@ def run_eval_loop(
 ):
     import matplotlib.pyplot as plt
 
-    env.eval()
-    agent = agent.load()
-
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
     ep_len = min(ep_len, 100)
+    env.eval()
+    agent = agent.load()
 
     eval_sums = np.zeros(ep_len)
     eval_mins = np.ones(ep_len) * np.inf
@@ -251,7 +250,13 @@ def main():
 
         run_training_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
     elif args.command == "eval":
-        run_eval_loop(drl_config, tsb_logger, args, env, agent)
+        run_eval_loop(
+            drl_config,
+            tsb_logger,
+            args,
+            env,
+            agent,
+        )
     else:
         raise ValueError(f"Invalid command: {args.command}")
 
