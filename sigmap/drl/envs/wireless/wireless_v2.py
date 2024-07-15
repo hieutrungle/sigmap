@@ -98,14 +98,7 @@ class WirelessEnvV2(Env):
         }
         return observation
 
-    def reset(
-        self, use_constraints=False, seed=None, options=None
-    ) -> Tuple[dict, dict]:
-        super().reset(seed=seed, options=options)
-        self.ep_return = 0
-        self.ep_step = 0
-
-        # Random initial state
+    def _reset_state(self, use_constraints=False):
         if use_constraints:
             self._focal_pts = self.rng.normal(size=self.focal_pts_shape)
             self._focal_pts[:, 0] += self._default_tx_positions
@@ -243,11 +236,11 @@ class WirelessEnvV2(Env):
         )
         bl_output_txt = os.path.join(tmp_dir, "bl_outputs.txt")
 
-        # TODO: Need to update the blender_command to support different blender scenes
+        scene_name = utils.load_yaml_file(self.sionna_config_file)["scene_name"]
         blender_command = [
             blender_app,
             "-b",
-            os.path.join(blender_dir, "models", "simple_hallway_color.blend"),
+            os.path.join(blender_dir, "models", f"{scene_name}.blend"),
             "--python",
             blender_script,
             "--",
