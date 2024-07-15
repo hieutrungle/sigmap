@@ -144,7 +144,7 @@ def run_eval_loop(
     eval_count = np.zeros(ep_len)
     eval_traj = np.zeros(ep_len)
 
-    for _ in range(num_evals):
+    for i in range(num_evals):
         (observation, info) = env.reset(use_constraints=False)
         for step in tqdm.trange(ep_len, dynamic_ncols=True):
             action = agent.get_action(observation)
@@ -156,6 +156,8 @@ def run_eval_loop(
             eval_count[step] += 1
             eval_sums[step] += eval_return
             max_step = max(max_step, step)
+
+            tsb_logger.log_scalar(eval_return, f"eval_return_{i}", step)
 
             if done:
                 print(f"current position: {observation['focal_pts']}")
