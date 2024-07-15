@@ -52,7 +52,7 @@ class WirelessReplayBuffer:
                     is_saved=False,
                 )
             print(f"Loaded {len(tmp_container)} samples from {self.saved_path}")
-            print(f"Current size: {self.size_counter}")
+            print(f"Current replay buffer size: {self.size_counter}")
 
     def sample(
         self, batch_size: int
