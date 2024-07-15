@@ -43,7 +43,7 @@ def run_training_loop(
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
 
     best_return = -np.inf
-    (observation, info) = env.reset(use_constraints=True)
+    (observation, info) = env.reset()
 
     # TODO: resume from existing replay buffer, checkpoint if specified thru args.resume
     # TODO: load agent, load replay buffer, modify sionna env to support loading from checkpoint
@@ -51,7 +51,7 @@ def run_training_loop(
     for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
         # accumulate data in replay buffer
         if step < drl_config.random_steps * 1 / 2:
-            observation, info = env.reset(use_constraints=True)
+            observation, info = env.reset()
             action = env.action_space.sample()
         elif step < drl_config.random_steps:
             action = env.action_space.sample()
@@ -145,7 +145,7 @@ def run_eval_loop(
     eval_traj = np.zeros(ep_len)
 
     for i in range(num_evals):
-        (observation, info) = env.reset(use_constraints=False)
+        (observation, info) = env.reset()
         for step in tqdm.trange(ep_len, dynamic_ncols=True):
             action = agent.get_action(observation)
             next_observation, reward, terminated, truncated, info = env.step(action)
