@@ -123,6 +123,15 @@ class WirelessEnvV2(Env):
             self._focal_pts, self.focal_pts_low, self.focal_pts_high
         )
 
+    def reset(
+        self, use_constraints=False, seed=None, options=None
+    ) -> Tuple[dict, dict]:
+        super().reset(seed=seed, options=options)
+        self.ep_return = 0
+        self.ep_step = 0
+
+        self._reset_state(use_constraints=use_constraints)
+
         self._tx_positions = np.asarray(self._default_tx_positions, dtype=np.float32)
         self._rx_positions = np.asarray(self._default_rx_positions, dtype=np.float32)
 
