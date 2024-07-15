@@ -111,8 +111,8 @@ class WirelessEnvV2(Env):
             self._focal_pts[:, 0] += self._default_tx_positions
             self._focal_pts[:, 1] += self._default_rx_positions
         else:
-            lower_bound = self.focal_pts_low + self.focal_pts_low * 0.25
-            upper_bound = self.focal_pts_high + self.focal_pts_high * 0.25
+            lower_bound = self.focal_pts_low - self.focal_pts_low * 0.25
+            upper_bound = self.focal_pts_high - self.focal_pts_high * 0.25
             self._focal_pts = self.rng.uniform(
                 lower_bound,
                 upper_bound,

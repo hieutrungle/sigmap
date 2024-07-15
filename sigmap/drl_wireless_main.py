@@ -150,19 +150,19 @@ def run_eval_loop(
             action = agent.get_action(observation)
             next_observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
+
+            eval_return = info["episode"]["r"]
+            eval_traj[step] = eval_return
+            eval_count[step] += 1
+            eval_sums[step] += eval_return
+            max_step = max(max_step, step)
+
             if done:
                 print(f"current position: {observation['focal_pts']}")
                 print(f"Terminated at step {step}")
                 break
             else:
                 observation = next_observation
-
-            eval_return = info["episode"]["r"]
-
-            eval_traj[step] = eval_return
-            eval_count[step] += 1
-            eval_sums[step] += eval_return
-            max_step = max(max_step, step)
 
         # the current max step for indexing
         t = max_step + 1
