@@ -68,6 +68,14 @@ In `assets/blender` directory, you have to provide the following:
 
 The other two directories `assets/images` and `assets/videos` are used to store the images and videos of the structure. They will be automatically created when running the code.
 
+### Usage
+
+#### Deep Reinforcement Learning Configuration
+
+There are two config files:
+-   `config/drl_[name]_beamfocusing.yaml`: Configuration file for DRL parameter
+-   `config/drl_[name]_hallway.yaml`: Configuration file for Sionna simulation. `scene_name` in this file must be the same as the name of the blender scene.
+
 ## Run
 
 ```bash
