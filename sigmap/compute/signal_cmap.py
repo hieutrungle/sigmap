@@ -19,9 +19,6 @@ class SignalCoverageMap:
         self._compute_scene_path = compute_scene_path
         self._viz_scene_path = viz_scene_path
 
-        # output directories
-        self.img_dir = utils.get_image_dir(config)
-
         # Camera
         self._cam = map_prep.prepare_camera(self.config)
 
@@ -106,8 +103,9 @@ class SignalCoverageMap:
 
         scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
 
+        img_dir = utils.get_image_dir(self.config)
         render_filename = utils.create_filename(
-            self.img_dir, f"{self.config.mitsuba_filename}_00000.png"
+            img_dir, f"{self.config.mitsuba_filename}_00000.png"
         )
         render_config = dict(
             camera=self.cam,
@@ -130,8 +128,9 @@ class SignalCoverageMap:
         scene = map_prep.prepare_scene(self.config, self._viz_scene_path, self.cam)
 
         if filename is None:
+            img_dir = utils.get_image_dir(self.config)
             render_filename = utils.create_filename(
-                self.img_dir, f"{self.config.mitsuba_filename}_00000.png"
+                img_dir, f"{self.config.mitsuba_filename}_00000.png"
             )
         else:
             render_filename = filename
