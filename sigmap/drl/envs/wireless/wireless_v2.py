@@ -49,7 +49,7 @@ class WirelessEnvV2(Env):
         # Observation space
         # Each device has 2 focal points, 3 coordinates (x,y,z)
         self.focal_pts_shape = (num_devices, 2, 3)
-        low = np.array([-30, -30, -15])
+        low = np.array([-40, -40, -15])
         low = np.tile(low, (self.num_devices, 2, 1))
         self.focal_pts_low = low
         high = np.array([30, 30, 15])
