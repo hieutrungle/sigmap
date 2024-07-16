@@ -24,6 +24,7 @@ class WirelessEnvV2(Env):
         sionna_config_file,
         num_devices,
         seed,
+        log_string=None,
         action_scale=1.0,
         **kwargs,
     ):
@@ -34,6 +35,7 @@ class WirelessEnvV2(Env):
         self.action_scale = action_scale
         self.num_devices = num_devices
         self.seed = seed
+        self.log_string = log_string
         self.rng = np.random.default_rng(self.seed)
 
         self.sionna_config_file = sionna_config_file
@@ -300,7 +302,9 @@ class WirelessEnvV2(Env):
 
         sigmap_dir = utils.get_os_dir("SIGMAP_DIR")
 
-        img_dir = os.path.join(assets_dir, "images", scene_name + self.current_time)
+        img_dir = os.path.join(
+            assets_dir, "images", self.log_string + self.current_time
+        )
         mitsuba_filename = utils.load_yaml_file(self.sionna_config_file)[
             "mitsuba_filename"
         ]
