@@ -34,15 +34,6 @@ def wireless_config(
     seed: int = 0,
 ):
 
-    def make_env(render: bool = False):
-        return gym.make(
-            env_name,
-            sionna_config_file=args.sionna_config_file,
-            num_devices=args.num_devices,
-            seed=seed,
-            render_mode="rgb_array" if render else None,
-        )
-
     log_string = "{}-{}-s{}-aclr{}-crlr{}-allr{}-b{}-d{}".format(
         exp_name or "offpolicy_ac",
         env_name,
@@ -66,7 +57,16 @@ def wireless_config(
     )
 
     saved_path = saved_path + log_string
-    # saved_path = saved_path + f"-seed{seed}"
+
+    def make_env(render: bool = False):
+        return gym.make(
+            env_name,
+            sionna_config_file=args.sionna_config_file,
+            num_devices=args.num_devices,
+            seed=seed,
+            log_string=log_string,
+            render_mode="rgb_array" if render else None,
+        )
 
     return {
         "agent_kwargs": {
