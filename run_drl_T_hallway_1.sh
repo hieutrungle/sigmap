@@ -73,5 +73,5 @@ export TMP_DIR
 # DRL run
 ##############################
 DEVICE_CONFIG="--num_devices 2"
-python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command train -dcfg ${SIGMAP_DIR}/config/drl_T_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
-python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command eval -dcfg ${SIGMAP_DIR}/config/drl_T_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
+python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command train -dcfg ${SIGMAP_DIR}/config/drl_T_beamfocusing_1.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
+python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command eval -dcfg ${SIGMAP_DIR}/config/drl_T_beamfocusing_1.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
