@@ -229,8 +229,10 @@ class WirelessEnvV2(Env):
         blender_output_dir = os.path.join(assets_dir, "blender")
         tmp_dir = utils.get_tmp_dir()
 
-        tmp_file = os.path.join(tmp_dir, "focal_pts.pkl")
-        with open(tmp_file, "wb") as f:
+        focal_name = "focal_pts-" + self.log_string + self.current_time + ".pkl"
+        focal_path = os.path.join(tmp_dir, focal_name)
+
+        with open(focal_path, "wb") as f:
             pickle.dump(focal_pts, f)
 
         blender_script = os.path.join(
@@ -248,17 +250,17 @@ class WirelessEnvV2(Env):
             "--",
             "-cfg",
             self.sionna_config_file,
+            "-i",
+            focal_path,
             "-o",
             blender_output_dir,
         ]
         try:
             subprocess.run(blender_command, check=True, stdout=open(bl_output_txt, "a"))
         except subprocess.CalledProcessError as e:
-            os.remove(tmp_file)
             raise Exception(f"Error running Blender command: {e}")
-
-        finally:
-            os.remove(tmp_file)
+        # finally:
+        #     os.remove(focal_path)
 
     def _run_sionna(self, use_cmap: bool = False) -> float:
         path_gain = self._cal_path_gain(use_cmap=use_cmap)
@@ -338,12 +340,12 @@ class WirelessEnvV2(Env):
                 sionna_command, check=True, stdout=open(sionna_output_txt, "a")
             )
         except subprocess.CalledProcessError as e:
-            # print(f"Error running Sionna command: {e}")
             raise Exception(f"Error running Sionna command: {e}")
         finally:
             pass
 
-        results_file = os.path.join(tmp_dir, "path_gain.txt")
+        results_name = "path_gain-" + self.log_string + self.current_time + ".txt"
+        results_file = os.path.join(tmp_dir, results_name)
         with open(results_file, "r") as f:
             results_dict = json.load(f)
             path_gain = results_dict["path_gain"]

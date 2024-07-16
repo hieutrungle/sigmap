@@ -48,8 +48,10 @@ def main():
 
         sig_cmap.render_to_file(coverage_map, None, filename=args.saved_path)
 
+    results_name = "path_gain-" + args.saved_path.split("/")[-2] + ".txt"
     tmp_dir = utils.get_tmp_dir()
-    results_file = os.path.join(tmp_dir, "path_gain.txt")
+    results_file = os.path.join(tmp_dir, results_name)
+    # results_file = os.path.join(tmp_dir, "path_gain.txt")
     results_dict = {
         "path_gain": path_gain,
     }

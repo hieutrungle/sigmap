@@ -81,7 +81,7 @@ def export_drl_hallway_focal_pts(args, config):
     tmp_dir = os.getenv("TMP_DIR")
     tmp_file = os.path.join(tmp_dir, "focal_pts.pkl")
 
-    with open(tmp_file, "rb") as f:
+    with open(args.input_path, "rb") as f:
         focal_pts = pickle.load(f)  # focal_pts: [num_devices, 2, 3]
 
     for device, focal_pt_tuple in zip(devices, focal_pts):
@@ -132,6 +132,7 @@ def create_argparser() -> bl_parser.ArgumentParserForBlender:
     """Parses command line arguments."""
     parser = bl_parser.ArgumentParserForBlender()
     parser.add_argument("--config_file", "-cfg", type=str, required=True)
+    parser.add_argument("--input_path", "-i", type=str, required=True)
     parser.add_argument("--output_dir", "-o", type=str, required=True)
     parser.add_argument("--verbose", "-v", action="store_true", default=False)
     parser.add_argument("--index", type=str)
