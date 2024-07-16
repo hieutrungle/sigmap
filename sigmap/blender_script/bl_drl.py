@@ -77,10 +77,6 @@ def export_drl_hallway_focal_pts(args, config):
             devices_names.append(k)
             devices.append(v.objects)
 
-    # Same tmp_file as in wireless.py -> self._cal_reward()
-    tmp_dir = os.getenv("TMP_DIR")
-    tmp_file = os.path.join(tmp_dir, "focal_pts.pkl")
-
     with open(args.input_path, "rb") as f:
         focal_pts = pickle.load(f)  # focal_pts: [num_devices, 2, 3]
 
