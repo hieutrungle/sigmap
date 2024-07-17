@@ -249,6 +249,16 @@ def main():
         replay_buffer = WirelessReplayBuffer(
             drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
         )
+        if drl_config.training_starts > replay_buffer.current_size():
+            drl_config.total_steps = (
+                drl_config.total_steps - replay_buffer.current_size()
+            )
+        else:
+            drl_config.total_steps = drl_config.total_steps - drl_config.training_starts
+        drl_config.random_steps = drl_config.random_steps - replay_buffer.current_size()
+        drl_config.training_starts = (
+            drl_config.training_starts - replay_buffer.current_size()
+        )
 
         run_training_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
     elif args.command == "eval":
