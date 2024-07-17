@@ -54,6 +54,9 @@ class WirelessReplayBuffer:
             print(f"Loaded {len(tmp_container)} samples from {self.saved_path}")
             print(f"Current replay buffer size: {self.size_counter}")
 
+    def current_size(self):
+        return self.size_counter
+
     def sample(
         self, batch_size: int
     ) -> Tuple[dict, np.ndarray, np.ndarray, dict, np.ndarray]:
