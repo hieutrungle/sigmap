@@ -1,6 +1,6 @@
 base_config: hallway
 mitsuba_filename: hallway
-scene_name: hallway_T
+scene_name: hallway_T_4
 resolution:
 - 1920
 - 1080
