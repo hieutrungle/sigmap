@@ -45,6 +45,7 @@ do
         BLENDER_APP=$file/blender
     fi
 done
+BLENDER_APP=${BLENDER_DIR}/blender-3.3.14-linux-x64_1
 
 # Open a random blender file to install and enable the mitsuba plugin
 mkdir -p ${BLENDER_DIR}/addons
