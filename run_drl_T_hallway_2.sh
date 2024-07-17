@@ -40,12 +40,13 @@ echo -e Assets directory: $ASSETS_DIR '\n'
 CONFIG_FILE=${SIGMAP_DIR}/config/drl_T_hallway_2.yaml
 
 # Find the blender executable
-for file in ${BLENDER_DIR}/*
-do
-    if [[ "$file" == *"blender-3.3"* ]];then
-        BLENDER_APP=$file/blender
-    fi
-done
+# for file in ${BLENDER_DIR}/*
+# do
+#     if [[ "$file" == *"blender-3.3"* ]];then
+#         BLENDER_APP=$file/blender
+#     fi
+# done
+BLENDER_APP=${BLENDER_DIR}/blender-3.3.14-linux-x64_2/blender
 
 # Open a random blender file to install and enable the mitsuba plugin
 mkdir -p ${BLENDER_DIR}/addons
