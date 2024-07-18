@@ -70,6 +70,9 @@ export ASSETS_DIR
 export CONFIG_FILE
 export TMP_DIR
 
+export OPTIX_CACHE_PATH=${SIGMAP_DIR}/tmp/optix_cache_2
+mkdir -p ${OPTIX_CACHE_PATH}
+
 ##############################
 # DRL run
 ##############################
