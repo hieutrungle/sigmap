@@ -78,4 +78,6 @@ mkdir -p ${OPTIX_CACHE_PATH}
 ##############################
 DEVICE_CONFIG="--num_devices 2"
 python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command train -dcfg ${SIGMAP_DIR}/config/drl_T_beamfocusing_1.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
+
+export OPTIX_CACHE_PATH=${SIGMAP_DIR}/tmp/optix_cache_1
 python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command eval -dcfg ${SIGMAP_DIR}/config/drl_T_beamfocusing_1.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
