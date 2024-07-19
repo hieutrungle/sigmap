@@ -45,10 +45,23 @@ def run_training_loop(
     best_return = -np.inf
     (observation, info) = env.reset()
 
-    # TODO: resume from existing replay buffer, checkpoint if specified thru args.resume
-    # TODO: load agent, load replay buffer, modify sionna env to support loading from checkpoint
+    try:
+        # load agent if exists, resume training
+        agent = agent.load()
+        print(f"Resuming training from step {agent.checkpoint_manager.latest_step()}")
+        start_step = agent.checkpoint_manager.latest_step()
+    except Exception as e:
+        print(f"Error in loading agent: {e}")
+        print(f"Training from scratch")
+        start_step = 0
+    start_step = int(start_step)
 
-    for step in tqdm.trange(drl_config.total_steps, dynamic_ncols=True):
+    for step in tqdm.tqdm(
+        range(start_step, drl_config.total_steps),
+        total=drl_config.total_steps,
+        dynamic_ncols=True,
+        initial=start_step,
+    ):
         # accumulate data in replay buffer
         if step < drl_config.random_steps * 1 / 2:
             observation, info = env.reset()
@@ -56,7 +69,6 @@ def run_training_loop(
         elif step < drl_config.random_steps:
             action = env.action_space.sample()
         else:
-            # // TODO: get correct action from agent
             action = agent.get_action(observation)
 
         # with timer.Timer(
@@ -248,16 +260,6 @@ def main():
         utils.mkdir_not_exists(buffer_saved_dir)
         replay_buffer = WirelessReplayBuffer(
             drl_config.replay_buffer_capacity, buffer_saved_dir, seed=seed
-        )
-        if drl_config.training_starts > replay_buffer.current_size():
-            drl_config.total_steps = (
-                drl_config.total_steps - replay_buffer.current_size()
-            )
-        else:
-            drl_config.total_steps = drl_config.total_steps - drl_config.training_starts
-        drl_config.random_steps = drl_config.random_steps - replay_buffer.current_size()
-        drl_config.training_starts = (
-            drl_config.training_starts - replay_buffer.current_size()
         )
 
         run_training_loop(drl_config, tsb_logger, args, env, agent, replay_buffer)
