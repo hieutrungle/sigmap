@@ -276,7 +276,7 @@ class SoftActorCritic:
             learning_rate: float, num_train_steps: int = None
         ) -> optax.GradientTransformation:
             init_value = learning_rate / 50
-            end_value = learning_rate / 10
+            end_value = learning_rate / 5
             if num_train_steps == None:
                 num_train_steps = 1_000
             warmup_steps = num_train_steps // 5
