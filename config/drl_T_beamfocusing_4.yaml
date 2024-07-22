@@ -3,7 +3,7 @@ base_config: wireless
 exp_name: sac_beamforming_hallway_T
 env_name: wireless-sigmap-v2
 
-replay_buffer_capacity: 10500
+replay_buffer_capacity: 25000
 total_steps: 5000
 random_steps: 500
 training_starts: 600
