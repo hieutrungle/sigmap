@@ -47,7 +47,7 @@ rx_horizontal_spacing: 0.5
 rx_pattern: iso
 rx_polarization: V
 rx_position:
-- -5.5
+- -12.75
 - -2.75
 - 1.5
 rx_orientation:
