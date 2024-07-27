@@ -36,15 +36,16 @@ echo Blender directory: $BLENDER_DIR
 echo Coverage map directory: $SIGMAP_DIR
 echo -e Assets directory: $ASSETS_DIR '\n'
 
-CONFIG_FILE=${SIGMAP_DIR}/config/drl_L_hallway.yaml
+CONFIG_FILE=${SIGMAP_DIR}/config/drl_L_hallway_3.yaml
 
 # Find the blender executable
-for file in ${BLENDER_DIR}/*
-do
-    if [[ "$file" == *"blender-3.3"* ]];then
-        BLENDER_APP=$file/blender
-    fi
-done
+# for file in ${BLENDER_DIR}/*
+# do
+#     if [[ "$file" == *"blender-3.3"* ]];then
+#         BLENDER_APP=$file/blender
+#     fi
+# done
+BLENDER_APP=${BLENDER_DIR}/blender-3.3.14-linux-x64_3/blender
 
 # Open a random blender file to install and enable the mitsuba plugin
 mkdir -p ${BLENDER_DIR}/addons
@@ -52,7 +53,7 @@ if [ ! -f ${BLENDER_DIR}/addons/mitsuba*.zip ]; then
     wget -P ${BLENDER_DIR}/addons https://github.com/mitsuba-renderer/mitsuba-blender/releases/download/v0.3.0/mitsuba-blender.zip 
     # unzip mitsuba-blender.zip -d ${BLENDER_DIR}/addons
 fi
-${BLENDER_APP} -b ${BLENDER_DIR}/models/hallway_L.blend --python ${SIGMAP_DIR}/sigmap/blender_script/install_mitsuba_addon.py
+${BLENDER_APP} -b ${BLENDER_DIR}/models/hallway_L_3.blend --python ${SIGMAP_DIR}/sigmap/blender_script/install_mitsuba_addon.py -- --blender_app ${BLENDER_APP}
 
 # get scene_name from CONFIG_FILE
 # SCENE_NAME=$(python -c "import yaml; print(yaml.safe_load(open('${CONFIG_FILE}', 'r'))['scene_name'])")
@@ -68,8 +69,13 @@ export ASSETS_DIR
 export CONFIG_FILE
 export TMP_DIR
 
+export OPTIX_CACHE_PATH=${SIGMAP_DIR}/tmp/optix_cache_3
+mkdir -p ${OPTIX_CACHE_PATH}
+
 ##############################
 # DRL run
 ##############################
 DEVICE_CONFIG="--num_devices 1"
-python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command eval -dcfg ${SIGMAP_DIR}/config/drl_L_beamfocusing.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
+
+export OPTIX_CACHE_PATH=${SIGMAP_DIR}/tmp/optix_cache_3
+python ${SIGMAP_DIR}/sigmap/drl_wireless_main.py --command eval -dcfg ${SIGMAP_DIR}/config/drl_L_beamfocusing_3.yaml -scfg ${CONFIG_FILE} -v $DEVICE_CONFIG
