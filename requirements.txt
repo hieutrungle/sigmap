@@ -12,3 +12,4 @@ tensorboardX
 gymnasium
 distrax
 flax
+orbax-checkpoint
