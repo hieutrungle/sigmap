@@ -160,7 +160,13 @@ def run_eval_loop(
         (observation, info) = env.reset()
         for step in tqdm.trange(ep_len, dynamic_ncols=True):
             action = agent.get_action(observation)
-            next_observation, reward, terminated, truncated, info = env.step(action)
+            try:
+                next_observation, reward, terminated, truncated, info = env.step(action)
+            except Exception as e:
+                print(f"Error in step {step}: {e}")
+                time.sleep(2)
+                continue
+            # next_observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
             eval_return = info["episode"]["r"]
