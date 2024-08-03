@@ -5,6 +5,8 @@ import gymnasium as gym
 from gymnasium.wrappers.record_episode_statistics import RecordEpisodeStatistics
 
 import argparse
+import os
+from sigmap.utils import utils
 
 
 def wireless_config(
@@ -56,7 +58,8 @@ def wireless_config(
         (total_steps - training_starts) * num_train_steps_per_env_step
     )
 
-    saved_path = saved_path + log_string
+    assets_dir = utils.get_assets_dir()
+    saved_path = os.path.join(assets_dir, saved_path + log_string)
 
     def make_env(render: bool = False):
         return gym.make(

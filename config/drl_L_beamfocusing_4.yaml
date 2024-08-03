@@ -24,5 +24,5 @@ num_critics: 2
 num_critic_updates: 5
 temperature: 0.05
 num_actor_samples: 20
-saved_path: "./assets/saved_models/"
+saved_path: "./saved_models/"
 seed: 0
