@@ -27,6 +27,7 @@ from utils import scripting_utils, utils, timer
 
 import argparse
 from sigmap.drl.envs import register_envs
+import jax
 
 register_envs()
 
@@ -40,6 +41,7 @@ def run_training_loop(
     agent: SoftActorCritic,
     replay_buffer: WirelessReplayBuffer,
 ):
+    jax.config.update("jax_debug_nans", True)
     ep_len = drl_config.ep_len or env.spec.max_episode_steps
 
     best_return = -np.inf
