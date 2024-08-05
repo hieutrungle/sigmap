@@ -42,6 +42,7 @@ _str_to_activation = {
     "sigmoid": nn.activation.sigmoid,
     "swish": nn.activation.hard_swish,
     "gelu": nn.activation.gelu,
+    "elu": nn.activation.elu,
     "identity": Identity(),
 }
 
@@ -127,7 +128,7 @@ class Critic(nn.Module):
     observation_shapes: dict[str, Sequence[int]]
     action_shape: Sequence[int]
     hidden_sizes: Sequence[int] = (128, 128, 128)
-    activation: Activation = "gelu"
+    activation: Activation = "relu"
     output_activation: Activation = "identity"
 
     @nn.compact
